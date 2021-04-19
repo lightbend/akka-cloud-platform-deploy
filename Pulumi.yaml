@@ -1,0 +1,8 @@
+name: akka-cloud-platform-deploy
+description: Akka Cloud Platform Deployment Template for AWS
+runtime: nodejs
+template:
+  config:
+    aws:region:
+      description: The AWS region to deploy into
+      default: us-west-2
