@@ -14,6 +14,9 @@ if (installMetricsServer == undefined) {
 }
 
 
+// K8s namespace for operator
+const namespaceName = "lightbend";
+
 /**
  * Per NodeGroup IAM: each NodeGroup will bring its own, specific instance role and profile.
  */
@@ -108,8 +111,27 @@ if (installMetricsServer) {
 	);
 }
 
-const meterUsageRole = new aws.iam.Role(name("meter-usage-role"), {
-    assumeRolePolicy: JSON.stringify({
+// Create service account with MeterUsage IAM policy
+
+// Create a pulumi Kubernetes provider using the cluster's kubeconfig.
+// const k8sProvider = new k8s.Provider('k8s', {
+//   kubeconfig: cluster.kubeconfig.apply(JSON.stringify),
+// });
+
+// Create a k8s namespace in the cluster.
+const namespace = new k8s.core.v1.Namespace(namespaceName, {
+	metadata: {
+		name: namespaceName
+	}
+});
+
+// Get the OIDC provider's URL for the cluster.
+//const clusterOidcProvider = cluster.core.oidcProvider.url;
+
+const saName = pulumi.getProject();
+
+const meterUsageRolePolicy = new aws.iam.Policy(name("meter-usage-role-policy"), {
+    policy: JSON.stringify({
 	    "Version": "2012-10-17",
 	    "Statement": [
 	        {
@@ -123,6 +145,30 @@ const meterUsageRole = new aws.iam.Role(name("meter-usage-role"), {
 	})
 });
 
+// Create a new IAM role that assumes the MeterUsage policy.
+// const saRole = new aws.iam.Role(saName, {
+//   assumeRolePolicy: meterUsageRolePolicy,
+// });
+
+
+// // Attach the IAM role to an AWS S3 access policy.
+// const saMeterUsageRolePolicyAttachment = new aws.iam.RolePolicyAttachment(saName, {
+//   policyArn: meterUsageRolePolicy.arn,
+//   role: saRole,
+// });
+
+// Create a Service Account with the IAM role annotated to use with the Pod.
+const sa = new k8s.core.v1.ServiceAccount(
+  saName,
+  {
+    metadata: {
+      namespace: namespace.metadata.name,
+      name: saName,
+      annotations: {
+        'eks.amazonaws.com/role-arn': meterUsageRolePolicy.arn,
+      },
+    },
+  });
 
 // Export the cluster's kubeconfig.
 export const kubeconfig = cluster.kubeconfig;
