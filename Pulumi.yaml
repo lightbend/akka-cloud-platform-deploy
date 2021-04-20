@@ -1,5 +1,5 @@
-name: aws-ts-eks
-description: EKS cluster example
+name: akka-cloud-platform-deploy
+description: Akka Cloud Platform Deployment Template for AWS
 runtime: nodejs
 template:
   config:
