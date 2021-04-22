@@ -1,5 +1,3 @@
-// Copyright 2016-2019, Pulumi Corporation.  All rights reserved.
-
 import * as pulumi from "@pulumi/pulumi";
 import * as aws from "@pulumi/aws";
 import * as awsx from "@pulumi/awsx";
@@ -70,9 +68,15 @@ const cluster = new eks.Cluster(name("eks"), {
     instanceRoles: [ fixedWorkersRole ],
     vpcId: vpc.id,
     subnetIds: vpc.publicSubnetIds,
-    // fixme: use configuration
+    // fixme: add to configuration
     version: "1.17",
 });
+
+
+// Export the cluster's kubeconfig.
+export const kubeconfig = cluster.kubeconfig;
+// EKS cluster name
+export const clusterId = cluster.eksCluster.id;
 
 const fixedNodeGroup = cluster.createNodeGroup(name("fixed-workers-node-group"), {
     // fixme: use configuration
@@ -83,6 +87,7 @@ const fixedNodeGroup = cluster.createNodeGroup(name("fixed-workers-node-group"),
     instanceProfile: fixedWorkersInstanceProfile,
 });
 
+// fixme: support spot instance worker nodes? do they provision faster?
 // Now create a preemptible node group, using spot pricing, for our variable, ephemeral workloads.
 // const spotNodeGroup = new eks.NodeGroup("my-cluster-ng2", {
 //     cluster: cluster,
@@ -103,6 +108,8 @@ const fixedNodeGroup = cluster.createNodeGroup(name("fixed-workers-node-group"),
 //     providers: { kubernetes: cluster.provider},
 // });
 
+// fixme use tag, or copy yaml locally to control the version
+// fixme add tag to configuration
 // Install k8s metrics-server
 if (installMetricsServer) {
 	const metricsServer = new k8s.yaml.ConfigGroup("metrics-server",
@@ -112,13 +119,18 @@ if (installMetricsServer) {
 }
 
 // Create service account with MeterUsage IAM policy
+// Based on example: https://github.com/pulumi/pulumi-eks/blob/v0.30.0/examples/oidc-iam-sa/index.ts
 
 // Create a k8s namespace in the cluster.
 const namespace = new k8s.core.v1.Namespace(namespaceName, {
 	metadata: {
-		name: namespaceName // otherwise pulumi will append a random suffix to the namespace.. might be useful for integration testing to do that
+		// fixme: add to configuration, if DNE let pulumi generate random suffix?
+		// otherwise pulumi will append a random suffix to the namespace.. might be useful for integration testing to do that
+		name: namespaceName 
 	}
 });
+
+export const operatorNamespace = namespace.metadata.name;
 
 const saName = pulumi.getProject();
 
@@ -126,10 +138,10 @@ const saName = pulumi.getProject();
 if (!cluster?.core?.oidcProvider) {
     throw new Error("Invalid cluster OIDC provider URL");
 }
-const clusterOidcProvider = cluster.core.oidcProvider;
-export const clusterOidcProviderUrl = clusterOidcProvider.url;
 
-export const operatorNamespace = namespace.metadata.name;
+const clusterOidcProvider = cluster.core.oidcProvider;
+
+export const clusterOidcProviderUrl = clusterOidcProvider.url;
 
 const saAssumeRolePolicy = pulumi
 	.all([clusterOidcProviderUrl, clusterOidcProvider.arn, namespace.metadata])
@@ -189,7 +201,19 @@ const sa = new k8s.core.v1.ServiceAccount(
     },
   });
 
-// Export the cluster's kubeconfig.
-export const kubeconfig = cluster.kubeconfig;
-// EKS cluster name
-export const clusterId = cluster.eksCluster.id;
+// Install Akka Cloud Platform Helm Chart
+
+const akkaPlatformOperatorChart = new k8s.helm.v3.Chart("akka-operator", {
+    chart: "akka-operator",
+    namespace: operatorNamespace,
+    version: "1.1.17", // # fixme: add to configuration, omit `version` field to get latest
+	fetchOpts: {
+		repo: "https://lightbend.github.io/akka-operator-helm/"
+	},
+	// chart values don't support shorthand value assignment syntax i.e. `serviceAccount.name: "foo"`
+    values: { // fixme merge in chart value config from pulumi config
+  		serviceAccount: {
+  			name: saName
+  		}  		
+    }
+});
