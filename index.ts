@@ -51,15 +51,12 @@ export function createNodeGroupRole(name: string): aws.iam.Role {
     return role;
 }
 
-// Now create the roles and instance profiles for the two worker groups.
-const fixedWorkersRole = createNodeGroupRole(name("fixed-workers-role"));
-//const spotWorkersRole = createNodeGroupRole("spot-workers-role");
-const fixedWorkersInstanceProfile = new aws.iam.InstanceProfile(name("fixed-workers-instance-profile"), {role: fixedWorkersRole});
-//const spotWorkersInstanceProfile = new aws.iam.InstanceProfile("spot-workers-instance-profile", {role: spotWorkers});
-
-
 // Create a VPC for our cluster.
 const vpc = new awsx.ec2.Vpc(name("vpc"), { numberOfAvailabilityZones: 2 });
+
+// Now create the roles and instance profiles for the two worker groups.
+const fixedWorkersRole = createNodeGroupRole(name("fixed-workers-role"));
+const fixedWorkersInstanceProfile = new aws.iam.InstanceProfile(name("fixed-workers-instance-profile"), {role: fixedWorkersRole});
 
 // Create the EKS cluster itself and a deployment of the Kubernetes dashboard.
 const cluster = new eks.Cluster(name("eks"), {
@@ -72,17 +69,6 @@ const cluster = new eks.Cluster(name("eks"), {
     version: "1.17",
 });
 
-
-// Export the cluster's kubeconfig.
-export const kubeconfig = cluster.kubeconfig;
-// EKS cluster name
-export const clusterId = cluster.eksCluster.id;
-
-// Setup Pulumi Kubernetes provider. Used to define dependency order of the following resources
-const provider = new k8s.Provider("eks-k8s", {
-    kubeconfig: kubeconfig.apply(JSON.stringify),
-});
-
 const fixedNodeGroup = cluster.createNodeGroup(name("fixed-workers-node-group"), {
     // fixme: use configuration
     desiredCapacity: 3,
@@ -91,6 +77,17 @@ const fixedNodeGroup = cluster.createNodeGroup(name("fixed-workers-node-group"),
     labels: {"ondemand": "true"},
     instanceProfile: fixedWorkersInstanceProfile,
 });
+
+// Export the cluster's kubeconfig.
+export const kubeconfig = cluster.kubeconfig;
+// EKS cluster name
+export const clusterId = cluster.eksCluster.id;
+
+// Setup Pulumi Kubernetes provider. Used to define dependency order of the following resources by waiting for `kubeconfig` output variable to resolve
+const provider = new k8s.Provider("eks-k8s", {
+    kubeconfig: kubeconfig.apply(JSON.stringify),
+});
+
 
 // fixme use tag, or copy yaml locally to control the version
 // fixme add tag to configuration
@@ -101,8 +98,6 @@ if (installMetricsServer) {
 	    { provider: provider },
 	);
 }
-
-
 
 // Create service account with MeterUsage IAM policy
 // Based on example: https://github.com/pulumi/pulumi-eks/blob/v0.30.0/examples/oidc-iam-sa/index.ts
@@ -118,7 +113,7 @@ const namespace = new k8s.core.v1.Namespace(namespaceName, {
 
 export const operatorNamespace = namespace.metadata.name;
 
-const saName = pulumi.getProject();
+const saName = name("service-account");
 
 // Export the cluster OIDC provider URL.
 if (!cluster?.core?.oidcProvider) {
@@ -148,7 +143,7 @@ const saAssumeRolePolicy = pulumi
 	})
 );
 
-const saRole = new aws.iam.Role(saName, {
+const saRole = new aws.iam.Role(name("service-account-role"), {
   assumeRolePolicy: saAssumeRolePolicy.json,
 });
 
@@ -168,7 +163,7 @@ const meterUsagePolicy = new aws.iam.Policy(name("meter-usage-role-policy"), {
 });
 
 // Attach the IAM role to the MeterUsage policy
-const saMeterUsageRpa = new aws.iam.RolePolicyAttachment(saName, {
+const saMeterUsageRpa = new aws.iam.RolePolicyAttachment(name("service-account-role-attachment-policy"), {
   policyArn: meterUsagePolicy.arn,
   role: saRole,
 });

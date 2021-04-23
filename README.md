@@ -1,6 +1,6 @@
 # Akka Cloud Platform Deployment Template
 
-Pre-req: [Pulumi](https://www.pulumi.com/).
+Implemented with [Pulumi](https://www.pulumi.com/).
 
 ## Setup 
 
