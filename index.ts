@@ -78,6 +78,11 @@ export const kubeconfig = cluster.kubeconfig;
 // EKS cluster name
 export const clusterId = cluster.eksCluster.id;
 
+// Setup Pulumi Kubernetes provider. Used to define dependency order of the following resources
+const provider = new k8s.Provider("eks-k8s", {
+    kubeconfig: kubeconfig.apply(JSON.stringify),
+});
+
 const fixedNodeGroup = cluster.createNodeGroup(name("fixed-workers-node-group"), {
     // fixme: use configuration
     desiredCapacity: 3,
@@ -87,36 +92,17 @@ const fixedNodeGroup = cluster.createNodeGroup(name("fixed-workers-node-group"),
     instanceProfile: fixedWorkersInstanceProfile,
 });
 
-// fixme: support spot instance worker nodes? do they provision faster?
-// Now create a preemptible node group, using spot pricing, for our variable, ephemeral workloads.
-// const spotNodeGroup = new eks.NodeGroup("my-cluster-ng2", {
-//     cluster: cluster,
-//     instanceType: "t2.medium",
-//     desiredCapacity: 1,
-//     spotPrice: "1",
-//     minSize: 1,
-//     maxSize: 2,
-//     labels: {"preemptible": "true"},
-//     taints: {
-//         "special": {
-//             value: "true",
-//             effect: "NoSchedule",
-//         },
-//     },
-//     instanceProfile: instanceProfile2,
-// }, {
-//     providers: { kubernetes: cluster.provider},
-// });
-
 // fixme use tag, or copy yaml locally to control the version
 // fixme add tag to configuration
 // Install k8s metrics-server
 if (installMetricsServer) {
 	const metricsServer = new k8s.yaml.ConfigGroup("metrics-server",
 	    { files: "https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml" },
-	    { provider: cluster.provider },
+	    { provider: provider },
 	);
 }
+
+
 
 // Create service account with MeterUsage IAM policy
 // Based on example: https://github.com/pulumi/pulumi-eks/blob/v0.30.0/examples/oidc-iam-sa/index.ts
@@ -128,7 +114,7 @@ const namespace = new k8s.core.v1.Namespace(namespaceName, {
 		// otherwise pulumi will append a random suffix to the namespace.. might be useful for integration testing to do that
 		name: namespaceName 
 	}
-});
+}, {provider: provider});
 
 export const operatorNamespace = namespace.metadata.name;
 
@@ -144,7 +130,7 @@ const clusterOidcProvider = cluster.core.oidcProvider;
 export const clusterOidcProviderUrl = clusterOidcProvider.url;
 
 const saAssumeRolePolicy = pulumi
-	.all([clusterOidcProviderUrl, clusterOidcProvider.arn, namespace.metadata])
+	.all([cluster.core.oidcProvider.url, cluster.core.oidcProvider.arn, namespace.metadata])
 	.apply(([url, arn, ns]) => aws.iam.getPolicyDocument({
 	    statements: [{
 	        actions: ["sts:AssumeRoleWithWebIdentity"],
@@ -199,13 +185,13 @@ const sa = new k8s.core.v1.ServiceAccount(
         'eks.amazonaws.com/role-arn': saRole.arn
       },
     },
-  });
+  }, { provider: provider});
 
 // Install Akka Cloud Platform Helm Chart
 
 const akkaPlatformOperatorChart = new k8s.helm.v3.Chart("akka-operator", {
     chart: "akka-operator",
-    namespace: operatorNamespace,
+    namespace: namespace.metadata.name,
     version: "1.1.17", // # fixme: add to configuration, omit `version` field to get latest
 	fetchOpts: {
 		repo: "https://lightbend.github.io/akka-operator-helm/"
@@ -216,4 +202,4 @@ const akkaPlatformOperatorChart = new k8s.helm.v3.Chart("akka-operator", {
   			name: saName
   		}  		
     }
-});
+}, { provider: provider});
