@@ -11,11 +11,15 @@ class EksCloudCluster implements cloudcluster.CloudCluster {
   cluster: eks.Cluster;
   kubeconfig: pulumi.Output<any>;
   name: pulumi.Output<any>;
+  k8sProvider: k8s.Provider;
 
   constructor(cluster: eks.Cluster) {
     this.cluster = cluster;
     this.kubeconfig = cluster.kubeconfig;
     this.name = cluster.eksCluster.id;
+    this.k8sProvider = new k8s.Provider("eks-k8s", {
+      kubeconfig: this.kubeconfig.apply(JSON.stringify)
+    });
   }
 }
 
@@ -103,9 +107,8 @@ export function createCluster(): cloudcluster.CloudCluster {
  * Based on example: https://github.com/pulumi/pulumi-eks/blob/v0.30.0/examples/oidc-iam-sa/index.ts
  */
 export function operatorServiceAccount(
-  serviceAccountName: string, 
   cloudCluster: cloudcluster.CloudCluster, 
-  k8sProvider: k8s.Provider, 
+  serviceAccountName: string, 
   namespace: k8s.core.v1.Namespace): k8s.core.v1.ServiceAccount {
 
   if (!(cloudCluster instanceof EksCloudCluster)) {
@@ -163,7 +166,7 @@ export function operatorServiceAccount(
           'eks.amazonaws.com/role-arn': saRole.arn
         },
       },
-    }, { provider: k8sProvider});
+    }, { provider: cloudCluster.k8sProvider});
 
   return sa;
 }

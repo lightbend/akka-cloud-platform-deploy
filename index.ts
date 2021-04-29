@@ -12,20 +12,15 @@ if (installMetricsServer == undefined) {
   installMetricsServer = true;
 }
 
-
 // K8s namespace for operator
 // fixme add namespace configuration
 const namespaceName = "lightbend";
 
 let cluster: cloudcluster.CloudCluster = eks.createCluster();
+
 // Output the cluster's kubeconfig and name
 export const kubeconfig = cluster.kubeconfig;
 export const clusterName = cluster.name;
-
-// Setup Pulumi Kubernetes provider. Used to define dependency order of the following resources by waiting for `kubeconfig` output variable to resolve
-let k8sProvider = new k8s.Provider("eks-k8s", {
-  kubeconfig: kubeconfig.apply(JSON.stringify)
-});
 
 // fixme use tag, or copy yaml locally to control the version
 // fixme add tag to configuration
@@ -33,25 +28,25 @@ let k8sProvider = new k8s.Provider("eks-k8s", {
 if (installMetricsServer) {
   const metricsServer = new k8s.yaml.ConfigGroup("metrics-server",
     { files: "https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml" },
-    { provider: k8sProvider },
+    { provider: cluster.k8sProvider },
   );
 }
 
-// Create a k8s namespace in the cluster.
+// Create a k8s namespace for operator
 let namespace = new k8s.core.v1.Namespace(namespaceName, {
   metadata: {
     // fixme: add to configuration, if DNE let pulumi generate random suffix?
     // otherwise pulumi will append a random suffix to the namespace.. might be useful for integration testing to do that
     name: namespaceName 
   }
-}, {provider: k8sProvider});
+}, {provider: cluster.k8sProvider});
 
 // Operator namespace name
 export const operatorNamespace = namespace.metadata.name;
 
 let serviceAccountName = util.name("sa");
 
-let serviceAccount = eks.operatorServiceAccount(serviceAccountName, cluster, k8sProvider, namespace);
+let serviceAccount = eks.operatorServiceAccount(cluster, serviceAccountName, namespace);
 
 // Install Akka Cloud Platform Helm Chart
 let akkaPlatformOperatorChart = new k8s.helm.v3.Chart("akka-operator", {
@@ -62,9 +57,9 @@ let akkaPlatformOperatorChart = new k8s.helm.v3.Chart("akka-operator", {
     repo: "https://lightbend.github.io/akka-operator-helm/"
   },
   // chart values don't support shorthand value assignment syntax i.e. `serviceAccount.name: "foo"`
-    values: { // fixme merge in chart value config from pulumi config
-      serviceAccount: {
-        name: serviceAccountName
-      }
+  values: { // fixme merge in chart value config from pulumi config
+    serviceAccount: {
+      name: serviceAccountName
     }
-}, { provider: k8sProvider});
+  }
+}, { provider: cluster.k8sProvider});

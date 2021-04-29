@@ -35,7 +35,7 @@ pulumi config set aws:region eu-central-1
   * Or, if you have the `aws` command locally you can use `aws eks update-kubeconfig` to update your `~/.kube/config`.
   
   ```
-  aws eks update-kubeconfig --region $(pulumi config get "aws:region") --name $(pulumi stack output clusterId)
+  aws eks update-kubeconfig --region $(pulumi config get "aws:region") --name $(pulumi stack output clusterName)
   ```
 
 ## Run
