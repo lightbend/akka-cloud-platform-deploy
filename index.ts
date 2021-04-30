@@ -83,3 +83,5 @@ let bootstrapServersSecret = new k8s.core.v1.Secret(bootstrapServersSecretName, 
 });
 
 export const kafkaBootstrapServerSecret = bootstrapServersSecret.metadata.name;
+
+eks.createRdsCluster(cluster);

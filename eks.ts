@@ -100,6 +100,7 @@ function createNodeGroupRole(name: string): aws.iam.Role {
  * Creates an EKS cluster and its nodegroup.
  */
 export function createCluster(): model.CloudCluster {
+  // fixme: add number of az's to configuration, tie to MSK and RDS config for azs?
   // Create a VPC for our cluster.
   let vpc = new awsx.ec2.Vpc(util.name("vpc"), { numberOfAvailabilityZones: 2 });
 
@@ -288,4 +289,58 @@ export function createKafkaCluster(cloudCluster: model.CloudCluster): model.Kafk
   });
 
   return new AwsMskKafkaCluster(kafkaCluster);
+}
+
+export function createRdsCluster(cloudCluster: model.CloudCluster): pulumi.Output<aws.rds.Cluster> {
+  if (!(cloudCluster instanceof EksCloudCluster)) {
+    throw new Error("Invalid CloudCluster provided")
+  }
+
+  let eksCloudCluster = cloudCluster as EksCloudCluster;
+  let rdsName = util.name("rds");
+
+  let vpc = eksCloudCluster.vpc;
+
+  // try to get azs from vpc (from each subnet), but need to map over output and promise before can get result
+  // let availabilityZones = pulumi
+  //   .all([vpc.publicSubnetIds, vpc.privateSubnetIds, vpc.isolatedSubnetIds])
+  //   .apply(([pub, priv, iso]) => {
+      
+  //     pub.forEach(sub => pulumi.log.info(`keys: ${sub} ${Object.keys(sub)}`));
+  //     // let azs2 = pub.concat(priv).concat(iso)
+  //     //  .map(subnetx => subnetx.subnet.availabilityZone);
+
+  //     // pulumi.log.info(`type: ${azs2.constructor.name}`);
+  //     // azs2.forEach(sub => sub.apply(sb => pulumi.log.info(`type: ${sb}`)));
+  //     let azs = ["foo"];
+  //     return Array.from((new Set<string>(azs)).values());
+  //   });
+
+  let availabilityZones = aws.getAvailabilityZones({state: "available"});
+
+  let rds = availabilityZones.then(azsResult => {
+    // get 3 or less azs
+    let azs = azsResult.names;
+    if (azs.length >= 3) {
+      azs = azs.slice(0, 3);
+    }
+
+    azs.forEach(az => pulumi.log.info(`az: ${az}`));
+    let postgresqlRds = new aws.rds.Cluster(rdsName, {
+      availabilityZones: azs,
+      backupRetentionPeriod: 5,
+      clusterIdentifier: rdsName,
+      databaseName: "mydb",
+      engine: "aurora-postgresql",
+      masterPassword: "bar",
+      masterUsername: "foo",
+      preferredBackupWindow: "07:00-09:00",
+    });
+
+    return postgresqlRds;
+  });
+
+  // todo: create relational db model type
+  // convert Promise to Output
+  return pulumi.output(rds);
 }
