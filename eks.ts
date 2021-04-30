@@ -4,22 +4,38 @@ import * as awsx from "@pulumi/awsx";
 import * as eks from "@pulumi/eks";
 import * as k8s from "@pulumi/kubernetes";
 
-import * as cloudcluster from "./cloudcluster";
+import * as model from "./model";
 import * as util from "./util";
 
-class EksCloudCluster implements cloudcluster.CloudCluster {
+class EksCloudCluster implements model.CloudCluster {
+  vpc: awsx.ec2.Vpc;
   cluster: eks.Cluster;
+  nodeGroups: eks.NodeGroup[];
   kubeconfig: pulumi.Output<any>;
   name: pulumi.Output<any>;
   k8sProvider: k8s.Provider;
 
-  constructor(cluster: eks.Cluster) {
+  constructor(vpc: awsx.ec2.Vpc, cluster: eks.Cluster, nodeGroups: eks.NodeGroup[]) {
+    this.vpc = vpc;
     this.cluster = cluster;
     this.kubeconfig = cluster.kubeconfig;
     this.name = cluster.eksCluster.id;
+    this.nodeGroups = nodeGroups;
     this.k8sProvider = new k8s.Provider("eks-k8s", {
       kubeconfig: this.kubeconfig.apply(JSON.stringify)
     });
+  }
+}
+
+class AwsMskKafkaCluster implements model.KafkaCluster {
+  zookeeperConnectString: pulumi.Output<any>;
+  bootstrapBrokersTls: pulumi.Output<any>;
+  bootstrapBrokers: pulumi.Output<any>;
+
+  constructor(cluster: aws.msk.Cluster) {
+    this.zookeeperConnectString = cluster.zookeeperConnectString;
+    this.bootstrapBrokersTls = cluster.bootstrapBrokersTls;
+    this.bootstrapBrokers = cluster.bootstrapBrokers;
   }
 }
 
@@ -41,6 +57,20 @@ const meterUsagePolicy: string = JSON.stringify({
         "aws-marketplace:MeterUsage"
       ],
       "Resource": "*"
+    }
+  ]
+});
+
+const mskFireHoseRole: string = JSON.stringify({
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": "sts:AssumeRole",
+      "Principal": {
+        "Service": "firehose.amazonaws.com"
+      },
+      "Effect": "Allow",
+      "Sid": ""
     }
   ]
 });
@@ -69,7 +99,7 @@ function createNodeGroupRole(name: string): aws.iam.Role {
 /**
  * Creates an EKS cluster and its nodegroup.
  */
-export function createCluster(): cloudcluster.CloudCluster {
+export function createCluster(): model.CloudCluster {
   // Create a VPC for our cluster.
   let vpc = new awsx.ec2.Vpc(util.name("vpc"), { numberOfAvailabilityZones: 2 });
 
@@ -97,7 +127,7 @@ export function createCluster(): cloudcluster.CloudCluster {
     instanceProfile: workersInstanceProfile,
   });
 
-  return new EksCloudCluster(cluster);
+  return new EksCloudCluster(vpc, cluster, [nodeGroup]);
 }
 
 /**
@@ -107,7 +137,7 @@ export function createCluster(): cloudcluster.CloudCluster {
  * Based on example: https://github.com/pulumi/pulumi-eks/blob/v0.30.0/examples/oidc-iam-sa/index.ts
  */
 export function operatorServiceAccount(
-  cloudCluster: cloudcluster.CloudCluster, 
+  cloudCluster: model.CloudCluster, 
   serviceAccountName: string, 
   namespace: k8s.core.v1.Namespace): k8s.core.v1.ServiceAccount {
 
@@ -140,20 +170,14 @@ export function operatorServiceAccount(
     })
   );
 
-  let saRole = new aws.iam.Role(util.name("sa-role"), {
-    assumeRolePolicy: saAssumeRolePolicy.json,
-  });
-
-  let meterUsageRolePolicy = new aws.iam.Policy(util.name("billing-rp"), {
-    policy: meterUsagePolicy
-  });
+  let saRole = new aws.iam.Role(util.name("sa-role"), {assumeRolePolicy: saAssumeRolePolicy.json});
+  let meterUsageRolePolicy = new aws.iam.Policy(util.name("billing-rp"), {policy: meterUsagePolicy});
 
   // Attach the IAM role to the MeterUsage policy
   let saMeterUsageRpa = new aws.iam.RolePolicyAttachment(util.name("sa-rpa"), {
     policyArn: meterUsageRolePolicy.arn,
     role: saRole,
   });
-
 
   // Create a Service Account with the IAM role annotated to use with the Pod.
   let sa = new k8s.core.v1.ServiceAccount(
@@ -169,4 +193,99 @@ export function operatorServiceAccount(
     }, { provider: cloudCluster.k8sProvider});
 
   return sa;
+}
+
+/**
+ * Create AWS MSK Kafka cluster
+ */
+export function createKafkaCluster(cloudCluster: model.CloudCluster): model.KafkaCluster {
+  if (!(cloudCluster instanceof EksCloudCluster)) {
+    throw new Error("Invalid CloudCluster provided")
+  }
+
+  let eksCloudCluster = cloudCluster as EksCloudCluster;
+  let mskName = util.name("msk");
+
+  // give all the K8s nodegroup securitygroups full ingress access to MSK securitygroup for brokers
+  let nodeSecurityGroups = eksCloudCluster.nodeGroups.map(ng => ng.nodeSecurityGroup.id);
+  let sg = new aws.ec2.SecurityGroup(util.name("msk-sg"), {
+    vpcId: eksCloudCluster.vpc.id,
+    ingress: [{
+      description: "EKS NodeGroups ingress",
+      fromPort: 0,
+      toPort: 0,
+      protocol: "-1",
+      securityGroups: nodeSecurityGroups
+    }]
+  });
+  let kms = new aws.kms.Key(util.name("kms"), {description: mskName});
+  let logGroup = new aws.cloudwatch.LogGroup(util.name("msk-lg"), {});
+  let logBucket = new aws.s3.Bucket(util.name("msk-bucket"), {acl: "private"});
+  let firehoseRole = new aws.iam.Role(util.name("msk-firehose-role"), {assumeRolePolicy: mskFireHoseRole});
+  let mskStream = new aws.kinesis.FirehoseDeliveryStream(util.name("msk-stream"), {
+    destination: "s3",
+    s3Configuration: {
+      roleArn: firehoseRole.arn,
+      bucketArn: logBucket.arn,
+    },
+    tags: {
+      LogDeliveryEnabled: "placeholder",
+    },
+  });
+  let kafkaCluster = new aws.msk.Cluster(mskName, {
+    // fixme: add to configuration
+    kafkaVersion: "2.8.0",
+    // fixme: add to configuration
+    // must be multiple of number of subnets. default VPC has 2
+    numberOfBrokerNodes: 2,
+    brokerNodeGroupInfo: {
+      // fixme: add to configuration
+      instanceType: "kafka.m5.large",
+      // fixme: add to configuration
+      ebsVolumeSize: 1000,
+      clientSubnets: eksCloudCluster.vpc.publicSubnetIds,
+      securityGroups: [sg.id],
+    },
+    encryptionInfo: {
+      encryptionAtRestKmsKeyArn: kms.arn,
+      encryptionInTransit: {
+        // fixme: add to configuration
+        // enable TLS and PLAINTEXT client connections
+        // https://www.pulumi.com/docs/reference/pkg/aws/msk/cluster/#clusterencryptioninfoencryptionintransit
+        clientBroker: "TLS_PLAINTEXT"
+      }
+    },
+    openMonitoring: {
+      prometheus: {
+        jmxExporter: {
+          enabledInBroker: true,
+        },
+        nodeExporter: {
+          enabledInBroker: true,
+        },
+      },
+    },
+    loggingInfo: {
+      brokerLogs: {
+        cloudwatchLogs: {
+          enabled: true,
+          logGroup: logGroup.name,
+        },
+        firehose: {
+          enabled: true,
+          deliveryStream: mskStream.name,
+        },
+        s3: {
+          enabled: true,
+          bucket: logBucket.id,
+          prefix: "logs/msk-",
+        },
+      },
+    },
+    tags: {
+      // foo: "bar",
+    },
+  });
+
+  return new AwsMskKafkaCluster(kafkaCluster);
 }

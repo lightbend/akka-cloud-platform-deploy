@@ -1,8 +1,8 @@
 import * as pulumi from "@pulumi/pulumi";
 import * as k8s from "@pulumi/kubernetes";
 
-import * as cloudcluster from "./cloudcluster";
 import * as eks from "./eks";
+import * as model from "./model";
 import * as util from "./util";
 
 let config = new pulumi.Config();
@@ -16,7 +16,7 @@ if (installMetricsServer == undefined) {
 // fixme add namespace configuration
 const namespaceName = "lightbend";
 
-let cluster: cloudcluster.CloudCluster = eks.createCluster();
+let cluster: model.CloudCluster = eks.createCluster();
 
 // Output the cluster's kubeconfig and name
 export const kubeconfig = cluster.kubeconfig;
@@ -63,3 +63,23 @@ let akkaPlatformOperatorChart = new k8s.helm.v3.Chart("akka-operator", {
     }
   }
 }, { provider: cluster.k8sProvider});
+
+let kafkaCluster = eks.createKafkaCluster(cluster);
+
+export const kafkaZookeeperConnectString = kafkaCluster.zookeeperConnectString;
+export const kafkaBootstrapBrokersTls = kafkaCluster.bootstrapBrokersTls;
+export const kafkaBootstrapBrokers = kafkaCluster.bootstrapBrokers;
+
+// K8s secret with bootstrap.servers connection string
+let bootstrapServersSecretName = util.name("kafka-secret");
+let bootstrapServersSecret = new k8s.core.v1.Secret(bootstrapServersSecretName, {
+  metadata: {
+    name: bootstrapServersSecretName,
+    namespace: namespace.metadata.name
+  },
+  stringData: {
+    bootstrapServers: kafkaBootstrapBrokers
+  }
+});
+
+export const kafkaBootstrapServerSecret = bootstrapServersSecret.metadata.name;
