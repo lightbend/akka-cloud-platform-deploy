@@ -40,6 +40,26 @@ class AwsMskKafkaCluster implements model.KafkaCluster {
   }
 }
 
+class AuroraRdsDatabase implements model.RelationalDatabase {
+  rdsCluster: aws.rds.Cluster;
+  clusterId: pulumi.Output<any>;
+  username: pulumi.Output<any>;
+  password: pulumi.Output<any>;
+  dbName: pulumi.Output<any>;
+  endpoint: pulumi.Output<any>;
+  readerEndpoint: pulumi.Output<any>;
+
+  constructor(db: aws.rds.Cluster) {
+    this.rdsCluster = db;
+    this.clusterId = db.clusterResourceId;
+    this.username = db.masterUsername;
+    this.password = db.masterPassword;
+    this.dbName = db.databaseName;
+    this.endpoint = db.endpoint;
+    this.readerEndpoint = db.readerEndpoint;
+  }
+}
+
 /**
  * Per NodeGroup IAM: each NodeGroup will bring its own, specific instance role and profile.
  */
@@ -297,7 +317,7 @@ export function createKafkaCluster(cloudCluster: model.CloudCluster): model.Kafk
   return new AwsMskKafkaCluster(kafkaCluster);
 }
 
-export function createRdsCluster(cloudCluster: model.CloudCluster): aws.rds.Cluster {
+export function createRdsCluster(cloudCluster: model.CloudCluster): model.RelationalDatabase {
   if (!(cloudCluster instanceof EksCloudCluster)) {
     throw new Error("Invalid CloudCluster provided")
   }
@@ -310,30 +330,45 @@ export function createRdsCluster(cloudCluster: model.CloudCluster): aws.rds.Clus
   let password = new random.RandomPassword("password", {
     length: 16,
     special: true,
-    overrideSpecial: `_%@ `, // including spaces
+    overrideSpecial: `!#$%&*()-_=+[]{}<>:?`, // Only printable ASCII characters besides '/', '@', '"', ' ' may be used.
   });
+
+  // give all the K8s nodegroup securitygroups full ingress access to RDS securitygroup for brokers
+  let nodeSecurityGroups = eksCloudCluster.nodeGroups.map(ng => ng.nodeSecurityGroup.id);
 
   // defining a db subnet group is a pre-requisite for creating an RDS db in an existing VPC
   let subnetGroup = new aws.rds.SubnetGroup(util.name('rds-subnet-group'), {
     subnetIds: vpc.privateSubnetIds
   });
 
+  let auroraEngine = aws.rds.EngineType.AuroraPostgresql;
   // https://www.pulumi.com/docs/reference/pkg/aws/rds/cluster/
-  let postgresqlRds = new aws.rds.Cluster(rdsName, {
+  let auroraCluster = new aws.rds.Cluster(rdsName, {
     //availabilityZones: azs,
     backupRetentionPeriod: 5,
     clusterIdentifier: rdsName,
-    databaseName: "apc",
-    engine: "aurora-postgresql",
-    masterUsername: "apcadmin",
+    databaseName: "acp",
+    engine: auroraEngine,
+    masterUsername: "acpadmin",
     masterPassword: password.result,
     preferredBackupWindow: "07:00-09:00",
     dbSubnetGroupName: subnetGroup.id,
     skipFinalSnapshot: true, // note: skips backup "snapshot" of db when pulumi stack is destroyed
-    vpcSecurityGroupIds: [vpc.vpc.defaultSecurityGroupId]
+    vpcSecurityGroupIds: nodeSecurityGroups
   });
 
+  let clusterInstances: aws.rds.ClusterInstance[] = [];
+  let rdsInstanceName = util.name("rds-inst");
 
-  // todo: create relational db model type
-  return postgresqlRds;
+  for (const range = {value: 0}; range.value < 2; range.value++) {
+    clusterInstances.push(new aws.rds.ClusterInstance(`${rdsInstanceName}-${range.value}`, {
+      identifier: `${rdsInstanceName}-${range.value}`,
+      clusterIdentifier: auroraCluster.id,
+      instanceClass: "db.r4.large",
+      engine: auroraEngine,
+      engineVersion: auroraCluster.engineVersion,
+    }));
+  }    
+
+  return new AuroraRdsDatabase(auroraCluster);
 }

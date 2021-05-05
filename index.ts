@@ -84,8 +84,27 @@ let bootstrapServersSecret = new k8s.core.v1.Secret(bootstrapServersSecretName, 
 
 export const kafkaBootstrapServerSecret = bootstrapServersSecret.metadata.name;
 
-let db = eks.createRdsCluster(cluster);
+let rdb = eks.createRdsCluster(cluster);
 
-export const dbUsername = db.masterUsername;
-export const dbPassword = db.masterPassword;
-export const dbName = db.databaseName;
+export const dbClusterId = rdb.clusterId;
+export const dbUsername = rdb.username;
+export const dbPassword = rdb.password;
+export const dbName = rdb.dbName;
+export const dbEndpoint = rdb.endpoint;
+export const dbReaderEndpoint = rdb.readerEndpoint;
+
+// Relational DB secret with username, password, and endpoint
+let rdbSecretName = util.name("rdb-secret");
+let rdbSecret = new k8s.core.v1.Secret(rdbSecretName, {
+  metadata: {
+    name: rdbSecretName,
+    namespace: namespace.metadata.name
+  },
+  stringData: {
+    username: dbUsername,
+    password: dbPassword,
+    connectionUrl: dbEndpoint
+  }
+}, {provider: cluster.k8sProvider});
+
+export const dbSecret = rdbSecretName;

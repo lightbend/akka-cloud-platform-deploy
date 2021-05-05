@@ -13,3 +13,12 @@ export interface KafkaCluster {
   bootstrapBrokersTls: pulumi.Output<any>;
   bootstrapBrokers: pulumi.Output<any>;
 }
+
+export interface RelationalDatabase {
+  clusterId: pulumi.Output<any>;
+  username: pulumi.Output<any>;
+  password: pulumi.Output<any>;
+  dbName: pulumi.Output<any>;
+  endpoint: pulumi.Output<any>;
+  readerEndpoint: pulumi.Output<any>;
+}
