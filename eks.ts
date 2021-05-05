@@ -3,6 +3,7 @@ import * as aws from "@pulumi/aws";
 import * as awsx from "@pulumi/awsx";
 import * as eks from "@pulumi/eks";
 import * as k8s from "@pulumi/kubernetes";
+import * as random from "@pulumi/random";
 
 import * as model from "./model";
 import * as util from "./util";
@@ -108,7 +109,8 @@ export function createCluster(): model.CloudCluster {
   let workersRole = createNodeGroupRole(util.name("workers-role"));
   let workersInstanceProfile = new aws.iam.InstanceProfile(util.name("workers-instprof"), {role: workersRole});
 
-  // Create the EKS cluster itself and a deployment of the Kubernetes dashboard.
+  // create the EKS cluster
+  // https://www.pulumi.com/docs/reference/pkg/aws/eks/cluster/
   let cluster = new eks.Cluster(util.name("eks"), {
     skipDefaultNodeGroup: true,
     createOidcProvider: true,
@@ -221,7 +223,10 @@ export function createKafkaCluster(cloudCluster: model.CloudCluster): model.Kafk
   });
   let kms = new aws.kms.Key(util.name("kms"), {description: mskName});
   let logGroup = new aws.cloudwatch.LogGroup(util.name("msk-lg"), {});
-  let logBucket = new aws.s3.Bucket(util.name("msk-bucket"), {acl: "private"});
+  let logBucket = new aws.s3.Bucket(util.name("msk-bucket"), {
+    acl: "private",
+    forceDestroy: true // note: delete bucket on pulumi destroy even if it's populated
+  });
   let firehoseRole = new aws.iam.Role(util.name("msk-firehose-role"), {assumeRolePolicy: mskFireHoseRole});
   let mskStream = new aws.kinesis.FirehoseDeliveryStream(util.name("msk-stream"), {
     destination: "s3",
@@ -233,6 +238,7 @@ export function createKafkaCluster(cloudCluster: model.CloudCluster): model.Kafk
       LogDeliveryEnabled: "placeholder",
     },
   });
+  // https://www.pulumi.com/docs/reference/pkg/aws/msk/cluster/#cluster
   let kafkaCluster = new aws.msk.Cluster(mskName, {
     // fixme: add to configuration
     kafkaVersion: "2.8.0",
@@ -291,7 +297,7 @@ export function createKafkaCluster(cloudCluster: model.CloudCluster): model.Kafk
   return new AwsMskKafkaCluster(kafkaCluster);
 }
 
-export function createRdsCluster(cloudCluster: model.CloudCluster): pulumi.Output<aws.rds.Cluster> {
+export function createRdsCluster(cloudCluster: model.CloudCluster): aws.rds.Cluster {
   if (!(cloudCluster instanceof EksCloudCluster)) {
     throw new Error("Invalid CloudCluster provided")
   }
@@ -301,46 +307,33 @@ export function createRdsCluster(cloudCluster: model.CloudCluster): pulumi.Outpu
 
   let vpc = eksCloudCluster.vpc;
 
-  // try to get azs from vpc (from each subnet), but need to map over output and promise before can get result
-  // let availabilityZones = pulumi
-  //   .all([vpc.publicSubnetIds, vpc.privateSubnetIds, vpc.isolatedSubnetIds])
-  //   .apply(([pub, priv, iso]) => {
-      
-  //     pub.forEach(sub => pulumi.log.info(`keys: ${sub} ${Object.keys(sub)}`));
-  //     // let azs2 = pub.concat(priv).concat(iso)
-  //     //  .map(subnetx => subnetx.subnet.availabilityZone);
-
-  //     // pulumi.log.info(`type: ${azs2.constructor.name}`);
-  //     // azs2.forEach(sub => sub.apply(sb => pulumi.log.info(`type: ${sb}`)));
-  //     let azs = ["foo"];
-  //     return Array.from((new Set<string>(azs)).values());
-  //   });
-
-  let availabilityZones = aws.getAvailabilityZones({state: "available"});
-
-  let rds = availabilityZones.then(azsResult => {
-    // get 3 or less azs
-    let azs = azsResult.names;
-    if (azs.length >= 3) {
-      azs = azs.slice(0, 3);
-    }
-
-    azs.forEach(az => pulumi.log.info(`az: ${az}`));
-    let postgresqlRds = new aws.rds.Cluster(rdsName, {
-      availabilityZones: azs,
-      backupRetentionPeriod: 5,
-      clusterIdentifier: rdsName,
-      databaseName: "mydb",
-      engine: "aurora-postgresql",
-      masterPassword: "bar",
-      masterUsername: "foo",
-      preferredBackupWindow: "07:00-09:00",
-    });
-
-    return postgresqlRds;
+  let password = new random.RandomPassword("password", {
+    length: 16,
+    special: true,
+    overrideSpecial: `_%@ `, // including spaces
   });
 
+  // defining a db subnet group is a pre-requisite for creating an RDS db in an existing VPC
+  let subnetGroup = new aws.rds.SubnetGroup(util.name('rds-subnet-group'), {
+    subnetIds: vpc.privateSubnetIds
+  });
+
+  // https://www.pulumi.com/docs/reference/pkg/aws/rds/cluster/
+  let postgresqlRds = new aws.rds.Cluster(rdsName, {
+    //availabilityZones: azs,
+    backupRetentionPeriod: 5,
+    clusterIdentifier: rdsName,
+    databaseName: "apc",
+    engine: "aurora-postgresql",
+    masterUsername: "apcadmin",
+    masterPassword: password.result,
+    preferredBackupWindow: "07:00-09:00",
+    dbSubnetGroupName: subnetGroup.id,
+    skipFinalSnapshot: true, // note: skips backup "snapshot" of db when pulumi stack is destroyed
+    vpcSecurityGroupIds: [vpc.vpc.defaultSecurityGroupId]
+  });
+
+
   // todo: create relational db model type
-  // convert Promise to Output
-  return pulumi.output(rds);
+  return postgresqlRds;
 }

@@ -52,7 +52,7 @@ let serviceAccount = eks.operatorServiceAccount(cluster, serviceAccountName, nam
 let akkaPlatformOperatorChart = new k8s.helm.v3.Chart("akka-operator", {
   chart: "akka-operator",
   namespace: namespace.metadata.name,
-  version: "1.1.17", // # fixme: add to configuration, omit `version` field to get latest
+  version: "1.1.19", // # fixme: add to configuration, omit `version` field to get latest
   fetchOpts: {
     repo: "https://lightbend.github.io/akka-operator-helm/"
   },
@@ -80,8 +80,12 @@ let bootstrapServersSecret = new k8s.core.v1.Secret(bootstrapServersSecretName, 
   stringData: {
     bootstrapServers: kafkaBootstrapBrokers
   }
-});
+}, {provider: cluster.k8sProvider});
 
 export const kafkaBootstrapServerSecret = bootstrapServersSecret.metadata.name;
 
-eks.createRdsCluster(cluster);
+let db = eks.createRdsCluster(cluster);
+
+export const dbUsername = db.masterUsername;
+export const dbPassword = db.masterPassword;
+export const dbName = db.databaseName;
