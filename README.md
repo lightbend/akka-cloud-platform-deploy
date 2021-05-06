@@ -4,6 +4,8 @@ Implemented with [Pulumi](https://www.pulumi.com/).
 
 ## Setup 
 
+For user facing instructions on running this playbook see the [Akka Platform Guide - AWS Quick Start](https://developer.lightbend.com/docs/akka-platform-guide/deployment/aws-install-quickstart.html) documentation.
+
 1. Install the required Node.js packages:
 
 ```bash
@@ -46,10 +48,9 @@ Run Pulumi up[date]:
 
 ```bash
 pulumi up
-
 ```
 
-# #Delete Cluster
+## Delete Cluster
 
 ```bash
 pulumi destroy
