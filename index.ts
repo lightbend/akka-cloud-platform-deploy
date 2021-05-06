@@ -103,7 +103,7 @@ let rdbSecret = new k8s.core.v1.Secret(rdbSecretName, {
   stringData: {
     username: dbUsername,
     password: dbPassword,
-    connectionUrl: dbEndpoint
+    connectionUrl: pulumi.interpolate `jdbc:postgresql://${dbEndpoint}:5432/${dbName}`
   }
 }, {provider: cluster.k8sProvider});
 
