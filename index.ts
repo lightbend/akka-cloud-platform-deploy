@@ -1,22 +1,22 @@
 import * as pulumi from "@pulumi/pulumi";
 import * as k8s from "@pulumi/kubernetes";
 
+import * as config from "./config";
 import * as eks from "./eks";
 import * as model from "./model";
 import * as util from "./util";
 
-let config = new pulumi.Config();
-// install metrics-server by default if no config exists
-var installMetricsServer = config.getBoolean("install-metrics-server");
-if (installMetricsServer == undefined) {
-  installMetricsServer = true;
-}
+let cloud: model.Cloud;
+
+if (config.cloud == config.AwsCloud)
+  cloud = new eks.AwsCloud();
+else
+  throw new Error(`invalid cloud configuration: ${config.cloud}`);
+
+let cluster: model.KubernetesCluster = cloud.createKubernetesCluster();
 
 // K8s namespace for operator
-// fixme add namespace configuration
-const namespaceName = "lightbend";
-
-let cluster: model.CloudCluster = eks.createCluster();
+let namespaceName = config.operatorNamespace;
 
 // Output the cluster's kubeconfig and name
 export const kubeconfig = cluster.kubeconfig;
@@ -25,7 +25,7 @@ export const clusterName = cluster.name;
 // fixme use tag, or copy yaml locally to control the version
 // fixme add tag to configuration
 // Install k8s metrics-server
-if (installMetricsServer) {
+if (config.installMetricsServer) {
   const metricsServer = new k8s.yaml.ConfigGroup("metrics-server",
     { files: "https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml" },
     { provider: cluster.k8sProvider },
@@ -46,7 +46,7 @@ export const operatorNamespace = namespace.metadata.name;
 
 let serviceAccountName = util.name("sa");
 
-let serviceAccount = eks.operatorServiceAccount(cluster, serviceAccountName, namespace);
+let serviceAccount = cloud.operatorServiceAccount(cluster, serviceAccountName, namespace);
 
 // Install Akka Cloud Platform Helm Chart
 let akkaPlatformOperatorChart = new k8s.helm.v3.Chart("akka-operator", {
@@ -64,47 +64,56 @@ let akkaPlatformOperatorChart = new k8s.helm.v3.Chart("akka-operator", {
   }
 }, { provider: cluster.k8sProvider});
 
-let kafkaCluster = eks.createKafkaCluster(cluster);
 
-export const kafkaZookeeperConnectString = kafkaCluster.zookeeperConnectString;
-export const kafkaBootstrapBrokersTls = kafkaCluster.bootstrapBrokersTls;
-export const kafkaBootstrapBrokers = kafkaCluster.bootstrapBrokers;
+let bootstrapServersSecretName: string | null = null;
+let kafkaCluster: model.KafkaCluster | null = null;
 
-// K8s secret with bootstrap.servers connection string
-let bootstrapServersSecretName = util.name("kafka-secret");
-let bootstrapServersSecret = new k8s.core.v1.Secret(bootstrapServersSecretName, {
-  metadata: {
-    name: bootstrapServersSecretName,
-    namespace: namespace.metadata.name
-  },
-  stringData: {
-    bootstrapServers: kafkaBootstrapBrokers
-  }
-}, {provider: cluster.k8sProvider});
+if (config.deployKafkaCluster) {
 
-export const kafkaBootstrapServerSecret = bootstrapServersSecret.metadata.name;
+  kafkaCluster = cloud.createKafkaCluster(cluster);
 
-let rdb = eks.createRdsCluster(cluster);
+  // K8s secret with bootstrap.servers connection string
+  bootstrapServersSecretName = util.name("kafka-secret");
+  let bootstrapServersSecret = new k8s.core.v1.Secret(bootstrapServersSecretName, {
+    metadata: {
+      name: bootstrapServersSecretName,
+      namespace: namespace.metadata.name
+    },
+    stringData: {
+      bootstrapServers: kafkaCluster.bootstrapBrokers
+    }
+  }, {provider: cluster.k8sProvider});
+}
 
-export const dbClusterId = rdb.clusterId;
-export const dbUsername = rdb.username;
-export const dbPassword = rdb.password;
-export const dbName = rdb.dbName;
-export const dbEndpoint = rdb.endpoint;
-export const dbReaderEndpoint = rdb.readerEndpoint;
+export const kafkaZookeeperConnectString = kafkaCluster?.zookeeperConnectString;
+export const kafkaBootstrapBrokersTls = kafkaCluster?.bootstrapBrokersTls;
+export const kafkaBootstrapBrokers = kafkaCluster?.bootstrapBrokers;
+export const kafkaBootstrapServerSecret = bootstrapServersSecretName;
 
-// Relational DB secret with username, password, and endpoint
-let rdbSecretName = util.name("rdb-secret");
-let rdbSecret = new k8s.core.v1.Secret(rdbSecretName, {
-  metadata: {
-    name: rdbSecretName,
-    namespace: namespace.metadata.name
-  },
-  stringData: {
-    username: dbUsername,
-    password: dbPassword,
-    connectionUrl: dbEndpoint
-  }
-}, {provider: cluster.k8sProvider});
+let jdbcSecretName: string | null = null;
+let jdbc: model.JdbcDatabase | null = null;
 
-export const dbSecret = rdbSecretName;
+if (config.deployJdbcDatabase) {
+  jdbc = cloud.createJdbcCluster(cluster);
+
+  jdbcSecretName = util.name("jdbc-secret");
+  let jdbcSecretResource = new k8s.core.v1.Secret(jdbcSecretName, {
+    metadata: {
+      name: jdbcSecretName,
+      namespace: namespace.metadata.name
+    },
+    stringData: {
+      username: jdbc.username,
+      password: jdbc.password,
+      connectionUrl: pulumi.interpolate `jdbc:postgresql://${jdbc.endpoint}:5432/${jdbc.dbName}`
+    }
+  }, {provider: cluster.k8sProvider});
+}
+
+export const jdbcClusterId = jdbc?.clusterId;
+export const jdbcUsername = jdbc?.username;
+export const jdbcPassword = jdbc?.password;
+export const jdbcDbName = jdbc?.dbName;
+export const jdbcEndpoint = jdbc?.endpoint;
+export const jdbcReaderEndpoint = jdbc?.readerEndpoint;
+export const jdbcSecret = jdbcSecretName;
