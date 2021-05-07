@@ -1,4 +1,4 @@
-# Akka Cloud Platform Deployment Template
+ # Akka Cloud Platform Deployment Template
 
 Implemented with [Pulumi](https://www.pulumi.com/).
 
