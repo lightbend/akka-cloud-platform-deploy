@@ -45,7 +45,6 @@ class AuroraRdsDatabase implements model.JdbcDatabase {
   clusterId: pulumi.Output<any>;
   username: pulumi.Output<any>;
   password: pulumi.Output<any>;
-  dbName: pulumi.Output<any>;
   endpoint: pulumi.Output<any>;
   readerEndpoint: pulumi.Output<any>;
 
@@ -54,7 +53,6 @@ class AuroraRdsDatabase implements model.JdbcDatabase {
     this.clusterId = db.clusterResourceId;
     this.username = db.masterUsername;
     this.password = db.masterPassword;
-    this.dbName = db.databaseName;
     this.endpoint = db.endpoint;
     this.readerEndpoint = db.readerEndpoint;
   }
@@ -356,9 +354,8 @@ export class AwsCloud implements model.Cloud {
     let auroraCluster = new aws.rds.Cluster(rdsName, {
       backupRetentionPeriod: 5,
       clusterIdentifier: rdsName,
-      databaseName: "public",
       engine: auroraEngine,
-      masterUsername: "acpadmin",
+      masterUsername: "postgres",
       masterPassword: password.result,
       preferredBackupWindow: "07:00-09:00",
       dbSubnetGroupName: subnetGroup.id,

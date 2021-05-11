@@ -105,7 +105,7 @@ if (config.deployJdbcDatabase) {
     stringData: {
       username: jdbc.username,
       password: jdbc.password,
-      connectionUrl: pulumi.interpolate `jdbc:postgresql://${jdbc.endpoint}:5432/${jdbc.dbName}`
+      connectionUrl: pulumi.interpolate `jdbc:postgresql://${jdbc.endpoint}:5432/`
     }
   }, {provider: cluster.k8sProvider});
 }
@@ -113,7 +113,6 @@ if (config.deployJdbcDatabase) {
 export const jdbcClusterId = jdbc?.clusterId;
 export const jdbcUsername = jdbc?.username;
 export const jdbcPassword = jdbc?.password;
-export const jdbcDbName = jdbc?.dbName;
 export const jdbcEndpoint = jdbc?.endpoint;
 export const jdbcReaderEndpoint = jdbc?.readerEndpoint;
 export const jdbcSecret = jdbcSecretName;
