@@ -356,7 +356,7 @@ export class AwsCloud implements model.Cloud {
     let auroraCluster = new aws.rds.Cluster(rdsName, {
       backupRetentionPeriod: 5,
       clusterIdentifier: rdsName,
-      databaseName: "acp",
+      databaseName: "public",
       engine: auroraEngine,
       masterUsername: "acpadmin",
       masterPassword: password.result,
