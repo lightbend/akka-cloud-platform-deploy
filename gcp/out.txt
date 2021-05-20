@@ -1,0 +1,8 @@
+I0520 11:45:19.268444    2389 backend.go:410] found username for access token
+I0520 11:45:20.744953    2389 backend.go:410] found username for access token
+I0520 11:45:24.554174    2389 operations_gcp.go:75] GetLogs[urn:pulumi:dev::akka-cloud-platform-gcp-deploy::gcp:sql/databaseInstance:DatabaseInstance::akka-plat-pg12instance]
+I0520 11:45:24.554219    2389 operations_gcp.go:81] GetLogs[urn:pulumi:dev::akka-cloud-platform-gcp-deploy::gcp:sql/databaseInstance:DatabaseInstance::akka-plat-pg12instance] does not produce logs
+I0520 11:45:24.554178    2389 operations_gcp.go:75] GetLogs[urn:pulumi:dev::akka-cloud-platform-gcp-deploy::gcp:container/cluster:Cluster::acp-dev-gke]
+I0520 11:45:24.554266    2389 operations_gcp.go:81] GetLogs[urn:pulumi:dev::akka-cloud-platform-gcp-deploy::gcp:container/cluster:Cluster::acp-dev-gke] does not produce logs
+I0520 11:45:24.554176    2389 operations_gcp.go:75] GetLogs[urn:pulumi:dev::akka-cloud-platform-gcp-deploy::gcp:container/nodePool:NodePool::primarynodes]
+I0520 11:45:24.554297    2389 operations_gcp.go:81] GetLogs[urn:pulumi:dev::akka-cloud-platform-gcp-deploy::gcp:container/nodePool:NodePool::primarynodes] does not produce logs
