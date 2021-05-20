@@ -40,9 +40,9 @@ let serviceAccount = cloud.operatorServiceAccount(
   serviceAccountName, 
   namespace);
 
-  // Install the license key into the namespace
+// Install the license key into the namespace
 const licenseSecret = new k8s.yaml.ConfigGroup("license-secret",
-  { files: "/Users/debasishghosh/lightbend/akka-cloud-platform-gcp-deploy/license.yaml" },
+  { files: config.licenseFile },
   { provider: cluster.k8sProvider },
 );
 

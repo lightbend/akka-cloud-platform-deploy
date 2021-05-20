@@ -2,9 +2,13 @@ import * as pulumi from "@pulumi/pulumi";
 import * as utils from "./utils";
 
 let config = new pulumi.Config();
+// license-file-path has to be set using cli 
+// `pulumi config set akka-cloud-platform-gcp-deploy:license-file-path <value>`
+let licenseFilePath = config.require("license-file-path");
 
 export const GcpCloud = "gcp";
 export const LightbendNamespace = "lightbend";
+export const licenseFile = licenseFilePath;
 
 export const cloud = config.get<string>("cloud") || GcpCloud;
 export const zone = config.get<string>("gcp:zone") || "europe-west1-b";
