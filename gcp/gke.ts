@@ -31,9 +31,13 @@ export class GcpCloud implements model.Cloud {
        initialNodeCount: 1,
        minMasterVersion: engineVersion,
        nodeVersion: engineVersion,
-       removeDefaultNodePool: true
+       removeDefaultNodePool: true,
+       // needed for VPC native cluster
+       // keeping the cidr blocks empty means GKE will automatically set them up
+       ipAllocationPolicy: { clusterIpv4CidrBlock: "", servicesIpv4CidrBlock: "" }
      });
 
+     // separate node pool
      const primaryPreemptibleNodes = new gcp.container.NodePool("primarynodes", {
        location: config.zone,
        cluster: cluster.name,
@@ -112,4 +116,40 @@ users:
 
     return sa;
   }
+
+  // Direct connectivity between GKE and Cloud SQL via a private IP is only possible 
+  // if using a Native VPC cluster otherwise the Cloud SQL proxy is required.
+  createCloudSQLInstance(): gcp.sql.DatabaseInstance {
+    const networkId = `projects/${ gcp.config.project }/global/networks/default`; 
+    const privateIpAddress = new gcp.compute.GlobalAddress("akka-private-ip-address", {
+      purpose: "VPC_PEERING",
+      addressType: "INTERNAL",
+      prefixLength: 16,
+      network: networkId
+    }, {});
+    
+    const privateVpcConnection = new gcp.servicenetworking.Connection("akka-private-vpc-connection", {
+      network: networkId,
+      service: "servicenetworking.googleapis.com",
+      reservedPeeringRanges: [privateIpAddress.name],
+    }, {});
+
+    const instance = new gcp.sql.DatabaseInstance("instance", {
+      databaseVersion: "POSTGRES_12",
+      region: config.region,
+      project: gcp.config.project,
+      settings: {
+          tier: "db-f1-micro",
+          ipConfiguration: {
+              ipv4Enabled: true,
+              privateNetwork: networkId,
+          },
+      },
+      deletionProtection: false,
+    }, {
+      dependsOn: [privateVpcConnection],
+    });
+    return instance;
+  }
+
 }

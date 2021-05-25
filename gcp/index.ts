@@ -1,5 +1,4 @@
 import * as k8s from "@pulumi/kubernetes";
-import * as gcp from "@pulumi/gcp";
 
 import * as config from "./config";
 import * as model from "./model";
@@ -82,11 +81,7 @@ let akkaPlatformOperatorChart = new k8s.helm.v3.Chart("akka-operator", {
   customTimeouts: { create: "30m", update: "30m", delete: "30m" }
 });
 
-let instance = new gcp.sql.DatabaseInstance("akka-plat-pg12instance", {
-  databaseVersion: "POSTGRES_12",
-  region: config.region, 
-  settings: {
-      tier: "db-f1-micro",
-  },
-  deletionProtection: false
-});
+const instance = cloud.createCloudSQLInstance();
+
+export const postgreSQLInstanceConnectionName = instance.connectionName
+export const postgreSQLInstanceName = instance.name
