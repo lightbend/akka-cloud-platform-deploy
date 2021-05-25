@@ -19,6 +19,18 @@ class GcpKubernetesCluster implements model.KubernetesCluster {
   }
 }
 
+class CloudSQLDatabaseInstance implements model.JdbcDatabaseInstance {
+  name: pulumi.Output<any>;
+  connectionName: pulumi.Output<any>;
+  endpoint: pulumi.Output<any>;
+
+  constructor(dbInstance: gcp.sql.DatabaseInstance) {
+    this.name = dbInstance.name;
+    this.connectionName = dbInstance.connectionName;
+    this.endpoint = dbInstance.privateIpAddress;
+  }
+}
+
 export class GcpCloud implements model.Cloud {
   /**
    * Creates a GCP cluster.
@@ -119,7 +131,7 @@ users:
 
   // Direct connectivity between GKE and Cloud SQL via a private IP is only possible 
   // if using a Native VPC cluster otherwise the Cloud SQL proxy is required.
-  createCloudSQLInstance(): gcp.sql.DatabaseInstance {
+  createCloudSQLInstance(): model.JdbcDatabaseInstance {
     const networkId = `projects/${ gcp.config.project }/global/networks/default`; 
     const privateIpAddress = new gcp.compute.GlobalAddress("akka-private-ip-address", {
       purpose: "VPC_PEERING",
@@ -149,7 +161,7 @@ users:
     }, {
       dependsOn: [privateVpcConnection],
     });
-    return instance;
+    return new CloudSQLDatabaseInstance(instance);
   }
 
 }

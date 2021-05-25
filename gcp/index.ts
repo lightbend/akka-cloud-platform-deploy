@@ -85,3 +85,4 @@ const instance = cloud.createCloudSQLInstance();
 
 export const postgreSQLInstanceConnectionName = instance.connectionName
 export const postgreSQLInstanceName = instance.name
+export const postgreSQLEndpoint = instance.endpoint
