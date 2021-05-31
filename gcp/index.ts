@@ -62,7 +62,7 @@ const appCrd = new k8s.yaml.ConfigGroup("app-crd",
 let akkaPlatformOperatorChart = new k8s.helm.v3.Chart("akka-operator", {
   chart: "akka-operator",
   namespace: namespace.metadata.name,
-  version: config.operatorVersion, // # fixme: omit `version` field to get latest
+  version: config.operatorVersion, 
   fetchOpts: {
     repo: "https://lightbend.github.io/akka-operator-helm/"
   },

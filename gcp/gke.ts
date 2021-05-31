@@ -39,7 +39,7 @@ export class GcpCloud implements model.Cloud {
      // Create a GKE cluster
      const engineVersion = gcp.container.getEngineVersions().then(v => v.latestMasterVersion);
      const cluster = new gcp.container.Cluster(config.clusterName, {
-       location: config.zone,
+       location: gcp.config.zone,
        initialNodeCount: 1,
        minMasterVersion: engineVersion,
        nodeVersion: engineVersion,
@@ -51,7 +51,7 @@ export class GcpCloud implements model.Cloud {
 
      // separate node pool
      const primaryPreemptibleNodes = new gcp.container.NodePool("primarynodes", {
-       location: config.zone,
+       location: gcp.config.zone,
        cluster: cluster.name,
        initialNodeCount: config.initialNodeCountInCluster,
        autoscaling: {
@@ -60,7 +60,7 @@ export class GcpCloud implements model.Cloud {
        },
        nodeConfig: {
          preemptible: true,
-         machineType: "n1-standard-4",
+         machineType: config.nodeMachineType,
          oauthScopes: ["https://www.googleapis.com/auth/cloud-platform"],
        },
      });
@@ -147,11 +147,10 @@ users:
     }, {});
 
     const instance = new gcp.sql.DatabaseInstance("instance", {
-      databaseVersion: "POSTGRES_12",
-      region: config.region,
+      databaseVersion: config.dbVersion,
       project: gcp.config.project,
       settings: {
-          tier: "db-f1-micro",
+          tier: config.dbInstanceTier,
           ipConfiguration: {
               ipv4Enabled: true,
               privateNetwork: networkId,
