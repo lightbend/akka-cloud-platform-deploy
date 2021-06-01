@@ -44,6 +44,7 @@ export class GcpCloud implements model.Cloud {
        minMasterVersion: engineVersion,
        nodeVersion: engineVersion,
        removeDefaultNodePool: true,
+       networkingMode: "VPC_NATIVE",
        // needed for VPC native cluster
        // keeping the cidr blocks empty means GKE will automatically set them up
        ipAllocationPolicy: { clusterIpv4CidrBlock: "", servicesIpv4CidrBlock: "" }

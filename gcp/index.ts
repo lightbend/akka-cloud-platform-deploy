@@ -52,13 +52,7 @@ const appCrd = new k8s.yaml.ConfigGroup("app-crd",
 );
 
 // Install Akka Cloud Platform Helm Chart
-// From the Platform Guide:
-//
-// helm install akka-operator akka-operator-helm/akka-operator \
-//   --namespace lightbend \
-//   --version=1.1.19 \  
-//   --set provider.name=gcp \
-//   --set reportingSecret=akka-cloud-platform-1-license
+// From the Platform Guide: https://developer.lightbend.com/docs/akka-platform-guide/deployment/gcp-install.html
 let akkaPlatformOperatorChart = new k8s.helm.v3.Chart("akka-operator", {
   chart: "akka-operator",
   namespace: namespace.metadata.name,
