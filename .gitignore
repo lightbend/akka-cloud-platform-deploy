@@ -1,6 +1,0 @@
-/bin/
-/node_modules/
-/.pulumi/
-# stack/environment files
-Pulumi.*.yaml
-package-lock.json

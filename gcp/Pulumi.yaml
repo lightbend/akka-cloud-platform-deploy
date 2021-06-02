@@ -1,0 +1,3 @@
+name: akka-cloud-platform-gcp-deploy
+runtime: nodejs
+description: Akka Platform GCP Deployment
