@@ -22,12 +22,10 @@ let namespaceName = config.operatorNamespace;
 export const kubeconfig = cluster.kubeconfig;
 export const clusterName = cluster.name;
 
-// fixme use tag, or copy yaml locally to control the version
-// fixme add tag to configuration
 // Install k8s metrics-server
 if (config.installMetricsServer) {
   const metricsServer = new k8s.yaml.ConfigGroup("metrics-server",
-    { files: "https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml" },
+    { files: "https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.4.4/components.yaml" },
     { provider: cluster.k8sProvider },
   );
 }
