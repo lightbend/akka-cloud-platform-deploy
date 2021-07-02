@@ -1,18 +1,11 @@
 import * as k8s from "@pulumi/kubernetes";
 
 import * as config from "./config";
-import * as model from "./model";
 import * as gke from "./gke";
 import * as utils from "./utils";
 
-let cloud: model.Cloud;
-
-if (config.cloud == config.GcpCloud)
-  cloud = new gke.GcpCloud();
-else
-  throw new Error(`invalid cloud configuration: ${config.cloud}`);
-
-const cluster: model.KubernetesCluster = cloud.createKubernetesCluster();
+const cloud = new gke.GcpCloud();
+const cluster: gke.GcpKubernetesCluster = cloud.createKubernetesCluster();
 
 // K8s namespace for operator
 const namespaceName = config.operatorNamespace;
