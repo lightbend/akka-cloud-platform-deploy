@@ -28,3 +28,9 @@ jobs:
           npm install
           npx tsc --build
           popd
+      - name: /gcp typescript build 
+        run: |
+          pushd gcp
+          npm install
+          npx tsc --build
+          popd

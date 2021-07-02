@@ -51,20 +51,7 @@ export class GcpCloud implements model.Cloud {
      });
 
      // separate node pool
-     new gcp.container.NodePool("primarynodes", {
-       location: gcp.config.zone,
-       cluster: cluster.name,
-       initialNodeCount: config.initialNodeCountInCluster,
-       autoscaling: {
-         maxNodeCount: config.autoscalingMaxNodeCount,
-         minNodeCount: config.autoscalingMinNodeCount
-       },
-       nodeConfig: {
-         preemptible: true,
-         machineType: config.nodeMachineType,
-         oauthScopes: ["https://www.googleapis.com/auth/cloud-platform"],
-       },
-     });
+     new gcp.container.NodePool("primarynodes", config.nodePoolArgs(cluster.name.get(), gcp.config.zone));
 
      const kubeconfig = pulumi.
          all([ cluster.name, cluster.endpoint, cluster.masterAuth ]).
@@ -145,20 +132,10 @@ users:
       reservedPeeringRanges: [privateIpAddress.name],
     }, {});
 
-    const instance = new gcp.sql.DatabaseInstance("instance", {
-      databaseVersion: config.dbVersion,
-      project: gcp.config.project,
-      settings: {
-          tier: config.dbInstanceTier,
-          ipConfiguration: {
-              ipv4Enabled: true,
-              privateNetwork: networkId,
-          },
-      },
-      deletionProtection: false,
-    }, {
-      dependsOn: [privateVpcConnection],
-    });
+    const instance = new gcp.sql.DatabaseInstance("instance",
+      config.databaseInstanceArgs(gcp.config.project, networkId),
+      { dependsOn: [privateVpcConnection], }
+    );
     return new CloudSQLDatabaseInstance(instance);
   }
 

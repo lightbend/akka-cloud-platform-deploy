@@ -1,12 +1,13 @@
 {
     "name": "akka-cloud-platform-gcp-deploy",
     "devDependencies": {
-        "@types/node": "^14.0.0"
+        "@types/node": "^14.0.0",
+        "typescript": "^3.7.7"
     },
     "dependencies": {
-        "@pulumi/pulumi": "^3.1.0",
         "@pulumi/gcp": "^5.0.0",
         "@pulumi/kubernetes": "^3.1.0",
+        "@pulumi/pulumi": "^3.1.0",
         "@pulumi/random": "^4.0.0"
     }
 }
