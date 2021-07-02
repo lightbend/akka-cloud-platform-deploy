@@ -1,8 +1,11 @@
 on:
+  push:
+    branches:
+      - "master"
   pull_request:
 
 jobs:
-  lint:
+  lint-and-build:
     runs-on: ubuntu-20.04
     steps:
       - uses: action/checkout@v2
@@ -15,5 +18,12 @@ jobs:
       - uses: actions/setup-node@v2
         with:
           node-version: '14'
+      - run: npm install
       - name: npm lint
         run: npx eslint . --ext .ts
+      - name: /aws typescript build 
+        run: |
+          pushd aws
+          npm install
+          npx tsc --build
+          popd

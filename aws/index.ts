@@ -6,13 +6,7 @@ import * as eks from "./eks";
 import * as model from "./model";
 import * as util from "./util";
 
-let cloud: model.Cloud;
-
-if (config.cloud == config.AwsCloud)
-  cloud = new eks.AwsCloud();
-else
-  throw new Error(`invalid cloud configuration: ${config.cloud}`);
-
+const cloud = new eks.AwsCloud();
 const cluster: model.KubernetesCluster = cloud.createKubernetesCluster();
 
 // K8s namespace for operator
