@@ -55,12 +55,7 @@ new k8s.yaml.ConfigGroup("app-crd",
 // Install Akka Cloud Platform Helm Chart
 // From the Platform Guide: https://developer.lightbend.com/docs/akka-platform-guide/deployment/gcp-install.html
 new k8s.helm.v3.Chart("akka-operator", {
-  chart: "akka-operator",
-  namespace: namespace.metadata.name,
-  version: config.operatorVersion, 
-  fetchOpts: {
-    repo: "https://lightbend.github.io/akka-operator-helm/"
-  },
+  ...config.akkaOperatorChartOpts,
   // chart values don't support shorthand value assignment syntax i.e. `serviceAccount.name: "foo"`
   values: { // fixme merge in chart value config from pulumi config
     serviceAccount: {
