@@ -3,11 +3,10 @@ import * as k8s from "@pulumi/kubernetes";
 
 import * as config from "./config";
 import * as eks from "./eks";
-import * as model from "./model";
 import * as util from "./util";
 
 const cloud = new eks.AwsCloud();
-const cluster: model.KubernetesCluster = cloud.createKubernetesCluster();
+const cluster: eks.EksKubernetesCluster = cloud.createKubernetesCluster();
 
 // K8s namespace for operator
 const namespaceName = config.operatorNamespace;
@@ -57,7 +56,7 @@ new k8s.helm.v3.Chart("akka-operator", {
 
 
 let bootstrapServersSecretName: string | null = null;
-let kafkaCluster: model.KafkaCluster | null = null;
+let kafkaCluster: eks.MskKafkaCluster | null = null;
 
 if (config.deployKafkaCluster) {
 
@@ -82,7 +81,7 @@ export const kafkaBootstrapBrokers = kafkaCluster?.bootstrapBrokers;
 export const kafkaBootstrapServerSecret = bootstrapServersSecretName;
 
 let jdbcSecretName: string | null = null;
-let jdbc: model.JdbcDatabase | null = null;
+let jdbc: eks.AuroraRdsDatabase | null = null;
 
 if (config.deployJdbcDatabase) {
   jdbc = cloud.createJdbcCluster(cluster);
