@@ -107,19 +107,17 @@ export class AwsCloud implements model.Cloud {
    * Creates a role and attaches the EKS worker node IAM managed policies.
    */
   createNodeGroupRole(name: string): aws.iam.Role {
-    let role = new aws.iam.Role(name, {
+    const role = new aws.iam.Role(name, {
       assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
         Service: "ec2.amazonaws.com",
       }),
     });
 
-    let counter = 0;
-    for (const policy of managedPolicyArns) {
-      // Create RolePolicyAttachment without returning it.
-      const rpa = new aws.iam.RolePolicyAttachment(`${name}-policy-${counter++}`,
+    managedPolicyArns.forEach((policy, counter) => {
+      new aws.iam.RolePolicyAttachment(`${name}-policy-${counter++}`,
         { policyArn: policy, role: role },
       );
-    }
+    });
 
     return role;
   }
@@ -130,15 +128,15 @@ export class AwsCloud implements model.Cloud {
   createKubernetesCluster(): model.KubernetesCluster {
     // fixme: add number of az's to configuration, tie to MSK and RDS config for azs?
     // Create a VPC for our cluster.
-    let vpc = new awsx.ec2.Vpc(util.name("vpc"), { numberOfAvailabilityZones: 2 });
+    const vpc = new awsx.ec2.Vpc(util.name("vpc"), { numberOfAvailabilityZones: 2 });
 
     // Now create the roles and instance profiles for the two worker groups.
-    let workersRole = this.createNodeGroupRole(util.name("workers-role"));
-    let workersInstanceProfile = new aws.iam.InstanceProfile(util.name("workers-instprof"), {role: workersRole});
+    const workersRole = this.createNodeGroupRole(util.name("workers-role"));
+    const workersInstanceProfile = new aws.iam.InstanceProfile(util.name("workers-instprof"), {role: workersRole});
 
     // create the EKS cluster
     // https://www.pulumi.com/docs/reference/pkg/aws/eks/cluster/
-    let cluster = new eks.Cluster(util.name("eks"), {
+    const cluster = new eks.Cluster(util.name("eks"), {
       skipDefaultNodeGroup: true,
       createOidcProvider: true,
       instanceRoles: [ workersRole ],
@@ -148,7 +146,7 @@ export class AwsCloud implements model.Cloud {
       version: "1.17",
     });
 
-    let nodeGroup = cluster.createNodeGroup(util.name("workers-ng"), {
+    const nodeGroup = cluster.createNodeGroup(util.name("workers-ng"), {
       // fixme: use configuration
       desiredCapacity: 3,
       minSize: 1,
@@ -169,19 +167,19 @@ export class AwsCloud implements model.Cloud {
   operatorServiceAccount(
     kubernetesCluster: model.KubernetesCluster, 
     serviceAccountName: string, 
-    namespace: k8s.core.v1.Namespace) {
+    namespace: k8s.core.v1.Namespace): k8s.core.v1.ServiceAccount {
 
     if (!(kubernetesCluster instanceof EksKubernetesCluster)) {
       throw new Error("Invalid KubernetesCluster provided")
     }
 
-    let eksCluster = (kubernetesCluster as EksKubernetesCluster).cluster;
+    const eksCluster = (kubernetesCluster as EksKubernetesCluster).cluster;
 
     if (!eksCluster?.core?.oidcProvider) {
       throw new Error("Invalid cluster OIDC provider URL");
     }
 
-    let saAssumeRolePolicy = pulumi
+    const saAssumeRolePolicy = pulumi
       .all([eksCluster.core.oidcProvider.url, eksCluster.core.oidcProvider.arn, namespace.metadata])
       .apply(([url, arn, ns]) => aws.iam.getPolicyDocument({
         statements: [{
@@ -200,17 +198,17 @@ export class AwsCloud implements model.Cloud {
       })
     );
 
-    let saRole = new aws.iam.Role(util.name("sa-role"), {assumeRolePolicy: saAssumeRolePolicy.json});
-    let meterUsageRolePolicy = new aws.iam.Policy(util.name("billing-rp"), {policy: meterUsagePolicy});
+    const saRole = new aws.iam.Role(util.name("sa-role"), {assumeRolePolicy: saAssumeRolePolicy.json});
+    const meterUsageRolePolicy = new aws.iam.Policy(util.name("billing-rp"), {policy: meterUsagePolicy});
 
     // Attach the IAM role to the MeterUsage policy
-    let saMeterUsageRpa = new aws.iam.RolePolicyAttachment(util.name("sa-rpa"), {
+    new aws.iam.RolePolicyAttachment(util.name("sa-rpa"), {
       policyArn: meterUsageRolePolicy.arn,
       role: saRole,
     });
 
     // Create a Service Account with the IAM role annotated to use with the Pod.
-    let sa = new k8s.core.v1.ServiceAccount(
+    const sa = new k8s.core.v1.ServiceAccount(
       serviceAccountName,
       {
         metadata: {
@@ -228,17 +226,17 @@ export class AwsCloud implements model.Cloud {
   /**
    * Create AWS MSK Kafka cluster
    */
-  createKafkaCluster(kubernetesCluster: model.KubernetesCluster) {
+  createKafkaCluster(kubernetesCluster: model.KubernetesCluster): model.KafkaCluster {
     if (!(kubernetesCluster instanceof EksKubernetesCluster)) {
       throw new Error("Invalid KubernetesCluster provided")
     }
 
-    let eksKubernetesCluster = kubernetesCluster as EksKubernetesCluster;
-    let mskName = util.name("msk");
+    const eksKubernetesCluster = kubernetesCluster as EksKubernetesCluster;
+    const mskName = util.name("msk");
 
     // give all the K8s nodegroup securitygroups full ingress access to MSK securitygroup for brokers
-    let nodeSecurityGroups = eksKubernetesCluster.nodeGroups.map(ng => ng.nodeSecurityGroup.id);
-    let sg = new aws.ec2.SecurityGroup(util.name("msk-sg"), {
+    const nodeSecurityGroups = eksKubernetesCluster.nodeGroups.map(ng => ng.nodeSecurityGroup.id);
+    const sg = new aws.ec2.SecurityGroup(util.name("msk-sg"), {
       vpcId: eksKubernetesCluster.vpc.id,
       ingress: [{
         description: "EKS NodeGroups ingress",
@@ -248,14 +246,14 @@ export class AwsCloud implements model.Cloud {
         securityGroups: nodeSecurityGroups
       }]
     });
-    let kms = new aws.kms.Key(util.name("kms"), {description: mskName});
-    let logGroup = new aws.cloudwatch.LogGroup(util.name("msk-lg"), {});
-    let logBucket = new aws.s3.Bucket(util.name("msk-bucket"), {
+    const kms = new aws.kms.Key(util.name("kms"), {description: mskName});
+    const logGroup = new aws.cloudwatch.LogGroup(util.name("msk-lg"), {});
+    const logBucket = new aws.s3.Bucket(util.name("msk-bucket"), {
       acl: "private",
       forceDestroy: true // note: delete bucket on pulumi destroy even if it's populated
     });
-    let firehoseRole = new aws.iam.Role(util.name("msk-firehose-role"), {assumeRolePolicy: mskFireHoseRole});
-    let mskStream = new aws.kinesis.FirehoseDeliveryStream(util.name("msk-stream"), {
+    const firehoseRole = new aws.iam.Role(util.name("msk-firehose-role"), {assumeRolePolicy: mskFireHoseRole});
+    const mskStream = new aws.kinesis.FirehoseDeliveryStream(util.name("msk-stream"), {
       destination: "s3",
       s3Configuration: {
         roleArn: firehoseRole.arn,
@@ -266,7 +264,7 @@ export class AwsCloud implements model.Cloud {
       },
     });
     // https://www.pulumi.com/docs/reference/pkg/aws/msk/cluster/#cluster
-    let kafkaCluster = new aws.msk.Cluster(mskName, {
+    const kafkaCluster = new aws.msk.Cluster(mskName, {
       // fixme: add to configuration
       kafkaVersion: "2.8.0",
       // fixme: add to configuration
@@ -324,34 +322,34 @@ export class AwsCloud implements model.Cloud {
     return new MskKafkaCluster(kafkaCluster);
   }
 
-  createJdbcCluster(kubernetesCluster: model.KubernetesCluster) {
+  createJdbcCluster(kubernetesCluster: model.KubernetesCluster): model.JdbcDatabase {
     if (!(kubernetesCluster instanceof EksKubernetesCluster)) {
       throw new Error("Invalid KubernetesCluster provided")
     }
 
-    let eksKubernetesCluster = kubernetesCluster as EksKubernetesCluster;
-    let rdsName = util.name("rds");
+    const eksKubernetesCluster = kubernetesCluster as EksKubernetesCluster;
+    const rdsName = util.name("rds");
 
-    let vpc = eksKubernetesCluster.vpc;
+    const vpc = eksKubernetesCluster.vpc;
 
-    let password = new random.RandomPassword("password", {
+    const password = new random.RandomPassword("password", {
       length: 16,
       special: true,
       overrideSpecial: `!#$%&*()-_=+[]{}<>:?`, // Only printable ASCII characters besides '/', '@', '"', ' ' may be used.
     });
 
     // give all the K8s nodegroup securitygroups full ingress access to RDS securitygroup for brokers
-    let nodeSecurityGroups = eksKubernetesCluster.nodeGroups.map(ng => ng.nodeSecurityGroup.id);
+    const nodeSecurityGroups = eksKubernetesCluster.nodeGroups.map(ng => ng.nodeSecurityGroup.id);
 
     // defining a db subnet group is a pre-requisite for creating an RDS db in an existing VPC
-    let subnetGroup = new aws.rds.SubnetGroup(util.name('rds-subnet-group'), {
+    const subnetGroup = new aws.rds.SubnetGroup(util.name('rds-subnet-group'), {
       subnetIds: vpc.privateSubnetIds
     });
 
-    let auroraEngine = aws.rds.EngineType.AuroraPostgresql;
+    const auroraEngine = aws.rds.EngineType.AuroraPostgresql;
 
     // https://www.pulumi.com/docs/reference/pkg/aws/rds/cluster/
-    let auroraCluster = new aws.rds.Cluster(rdsName, {
+    const auroraCluster = new aws.rds.Cluster(rdsName, {
       backupRetentionPeriod: 5,
       clusterIdentifier: rdsName,
       engine: auroraEngine,
@@ -363,8 +361,8 @@ export class AwsCloud implements model.Cloud {
       vpcSecurityGroupIds: nodeSecurityGroups
     });
 
-    let clusterInstances: aws.rds.ClusterInstance[] = [];
-    let rdsInstanceName = util.name("rds-inst");
+    const clusterInstances: aws.rds.ClusterInstance[] = [];
+    const rdsInstanceName = util.name("rds-inst");
 
     for (const range = {value: 0}; range.value < 2; range.value++) {
       clusterInstances.push(new aws.rds.ClusterInstance(`${rdsInstanceName}-${range.value}`, {

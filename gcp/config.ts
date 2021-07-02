@@ -1,10 +1,10 @@
 import * as pulumi from "@pulumi/pulumi";
 import * as utils from "./utils";
 
-let config = new pulumi.Config();
+const config = new pulumi.Config();
 // license-file-path has to be set using cli 
 // `pulumi config set akka-cloud-platform-gcp-deploy:license-file-path <value>`
-let licenseFilePath = config.require("license-file-path");
+const licenseFilePath = config.require("license-file-path");
 
 export const GcpCloud = "gcp";
 export const LightbendNamespace = "lightbend";
@@ -13,7 +13,7 @@ export const licenseFile = licenseFilePath;
 export const cloud = config.get<string>("cloud") || GcpCloud;
 
 // operatorVersion needs to be set
-let operatorVersionV = config.require("operator-version");
+const operatorVersionV = config.require("operator-version");
 
 export const operatorNamespace = config.get<string>("operator-namespace") || LightbendNamespace;
 export const operatorVersion = operatorVersionV;
