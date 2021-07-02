@@ -5,11 +5,10 @@ import * as eks from "@pulumi/eks";
 import * as k8s from "@pulumi/kubernetes";
 import * as random from "@pulumi/random";
 
-import * as model from "./model";
 import * as util from "./util";
 import * as config from "./config"
 
-class EksKubernetesCluster implements model.KubernetesCluster {
+export class EksKubernetesCluster {
   vpc: awsx.ec2.Vpc;
   cluster: eks.Cluster;
   nodeGroups: eks.NodeGroup[];
@@ -29,7 +28,7 @@ class EksKubernetesCluster implements model.KubernetesCluster {
   }
 }
 
-class MskKafkaCluster implements model.KafkaCluster {
+export class MskKafkaCluster {
   zookeeperConnectString: pulumi.Output<any>;
   bootstrapBrokersTls: pulumi.Output<any>;
   bootstrapBrokers: pulumi.Output<any>;
@@ -41,7 +40,7 @@ class MskKafkaCluster implements model.KafkaCluster {
   }
 }
 
-class AuroraRdsDatabase implements model.JdbcDatabase {
+export class AuroraRdsDatabase {
   rdsCluster: aws.rds.Cluster;
   clusterId: pulumi.Output<any>;
   username: pulumi.Output<any>;
@@ -101,7 +100,7 @@ const mskFireHoseRole: string = JSON.stringify({
   ]
 });
 
-export class AwsCloud implements model.Cloud {
+export class AwsCloud {
 
   /**
    * Creates a role and attaches the EKS worker node IAM managed policies.
@@ -125,7 +124,7 @@ export class AwsCloud implements model.Cloud {
   /**
    * Creates an EKS cluster and its nodegroup.
    */
-  createKubernetesCluster(): model.KubernetesCluster {
+  createKubernetesCluster(): EksKubernetesCluster {
     // Create a VPC for our cluster.
     const vpc = new awsx.ec2.Vpc(util.name("vpc"), config.vpcArgs);
 
@@ -160,15 +159,11 @@ export class AwsCloud implements model.Cloud {
    * Based on example: https://github.com/pulumi/pulumi-eks/blob/v0.30.0/examples/oidc-iam-sa/index.ts
    */
   operatorServiceAccount(
-    kubernetesCluster: model.KubernetesCluster, 
+    kubernetesCluster: EksKubernetesCluster, 
     serviceAccountName: string, 
     namespace: k8s.core.v1.Namespace): k8s.core.v1.ServiceAccount {
 
-    if (!(kubernetesCluster instanceof EksKubernetesCluster)) {
-      throw new Error("Invalid KubernetesCluster provided")
-    }
-
-    const eksCluster = (kubernetesCluster as EksKubernetesCluster).cluster;
+    const eksCluster = kubernetesCluster.cluster;
 
     if (!eksCluster?.core?.oidcProvider) {
       throw new Error("Invalid cluster OIDC provider URL");
@@ -221,18 +216,13 @@ export class AwsCloud implements model.Cloud {
   /**
    * Create AWS MSK Kafka cluster
    */
-  createKafkaCluster(kubernetesCluster: model.KubernetesCluster): model.KafkaCluster {
-    if (!(kubernetesCluster instanceof EksKubernetesCluster)) {
-      throw new Error("Invalid KubernetesCluster provided")
-    }
-
-    const eksKubernetesCluster = kubernetesCluster as EksKubernetesCluster;
+  createKafkaCluster(kubernetesCluster: EksKubernetesCluster): MskKafkaCluster {
     const mskName = util.name("msk");
 
     // give all the K8s nodegroup securitygroups full ingress access to MSK securitygroup for brokers
-    const nodeSecurityGroups = eksKubernetesCluster.nodeGroups.map(ng => ng.nodeSecurityGroup.id);
+    const nodeSecurityGroups = kubernetesCluster.nodeGroups.map(ng => ng.nodeSecurityGroup.id);
     const securityGroup = new aws.ec2.SecurityGroup(util.name("msk-sg"), {
-      vpcId: eksKubernetesCluster.vpc.id,
+      vpcId: kubernetesCluster.vpc.id,
       ingress: [{
         description: "EKS NodeGroups ingress",
         fromPort: 0,
@@ -260,7 +250,7 @@ export class AwsCloud implements model.Cloud {
     });
     // https://www.pulumi.com/docs/reference/pkg/aws/msk/cluster/#cluster
     const kafkaCluster = new aws.msk.Cluster(mskName, {
-      ...config.mksClusterOptions(eksKubernetesCluster.vpc, securityGroup, kms),
+      ...config.mksClusterOptions(kubernetesCluster.vpc, securityGroup, kms),
       openMonitoring: {
         prometheus: {
           jmxExporter: {
@@ -296,15 +286,10 @@ export class AwsCloud implements model.Cloud {
     return new MskKafkaCluster(kafkaCluster);
   }
 
-  createJdbcCluster(kubernetesCluster: model.KubernetesCluster): model.JdbcDatabase {
-    if (!(kubernetesCluster instanceof EksKubernetesCluster)) {
-      throw new Error("Invalid KubernetesCluster provided")
-    }
-
-    const eksKubernetesCluster = kubernetesCluster as EksKubernetesCluster;
+  createJdbcCluster(kubernetesCluster: EksKubernetesCluster): AuroraRdsDatabase {
     const rdsName = util.name("rds");
 
-    const vpc = eksKubernetesCluster.vpc;
+    const vpc = kubernetesCluster.vpc;
 
     const password = new random.RandomPassword("password", {
       length: 16,
@@ -313,7 +298,7 @@ export class AwsCloud implements model.Cloud {
     });
 
     // give all the K8s nodegroup securitygroups full ingress access to RDS securitygroup for brokers
-    const nodeSecurityGroups = eksKubernetesCluster.nodeGroups.map(ng => ng.nodeSecurityGroup.id);
+    const nodeSecurityGroups = kubernetesCluster.nodeGroups.map(ng => ng.nodeSecurityGroup.id);
 
     // defining a db subnet group is a pre-requisite for creating an RDS db in an existing VPC
     const subnetGroup = new aws.rds.SubnetGroup(util.name('rds-subnet-group'), {
