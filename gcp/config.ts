@@ -9,11 +9,8 @@ const config = new pulumi.Config();
 // `pulumi config set akka-cloud-platform-gcp-deploy:license-file-path <value>`
 const licenseFilePath = config.require("license-file-path");
 
-export const GcpCloud = "gcp";
 export const LightbendNamespace = "lightbend";
 export const licenseFile = licenseFilePath;
-
-export const cloud = config.get<string>("cloud") || GcpCloud;
 
 export const operatorNamespace = config.get<string>("operator-namespace") || LightbendNamespace;
 export const clusterName = config.get<string>("cluster-name") || utils.name("gke");
