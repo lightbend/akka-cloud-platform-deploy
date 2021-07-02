@@ -2,6 +2,7 @@ import * as eks from "@pulumi/eks";
 import * as aws from "@pulumi/aws";
 import * as awsx from "@pulumi/awsx";
 import * as pulumi from "@pulumi/pulumi";
+import { ChartOpts } from "@pulumi/kubernetes/helm/v3";
 
 const config = new pulumi.Config();
 
@@ -50,6 +51,14 @@ export function mksClusterOptions(vpc: awsx.ec2.Vpc, securityGroup: aws.ec2.Secu
         clientBroker: config.get<string>("msk-kafka-encryptionInfo-encryptionInTransit") || "TLS_PLAINTEXT"
       }
     }
+  }
+}
+
+export const akkaOperatorChartOpts: ChartOpts = {
+  chart: "akka-operator",
+  version: config.get<string>("akka-platform-operator-version") || "1.1.19",
+  fetchOpts: {
+    repo: "https://lightbend.github.io/akka-operator-helm/"
   }
 }
 
