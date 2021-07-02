@@ -56,7 +56,7 @@ export function mksClusterOptions(vpc: awsx.ec2.Vpc, securityGroup: aws.ec2.Secu
 
 export const akkaOperatorChartOpts: ChartOpts = {
   chart: "akka-operator",
-  version: config.get<string>("akka-platform-operator-version") || "1.1.19",
+  version: config.get<string>("operator-version") || "1.1.19",
   fetchOpts: {
     repo: "https://lightbend.github.io/akka-operator-helm/"
   }
