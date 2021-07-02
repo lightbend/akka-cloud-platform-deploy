@@ -2,10 +2,9 @@ import * as pulumi from "@pulumi/pulumi";
 import * as k8s from "@pulumi/kubernetes";
 import * as gcp from "@pulumi/gcp";
 
-import * as model from "./model";
 import * as config from "./config";
 
-class GcpKubernetesCluster implements model.KubernetesCluster {
+export class GcpKubernetesCluster {
   cluster: gcp.container.Cluster;
   kubeconfig: pulumi.Output<any>;
   name: pulumi.Output<any>;
@@ -19,7 +18,7 @@ class GcpKubernetesCluster implements model.KubernetesCluster {
   }
 }
 
-class CloudSQLDatabaseInstance implements model.JdbcDatabaseInstance {
+class CloudSQLDatabaseInstance {
   name: pulumi.Output<any>;
   connectionName: pulumi.Output<any>;
   endpoint: pulumi.Output<any>;
@@ -31,11 +30,11 @@ class CloudSQLDatabaseInstance implements model.JdbcDatabaseInstance {
   }
 }
 
-export class GcpCloud implements model.Cloud {
+export class GcpCloud {
   /**
    * Creates a GCP cluster.
    */
-   createKubernetesCluster(): model.KubernetesCluster {
+   createKubernetesCluster(): GcpKubernetesCluster {
      // Create a GKE cluster
      const engineVersion = gcp.container.getEngineVersions().then(v => v.latestMasterVersion);
      const cluster = new gcp.container.Cluster(config.clusterName, {
@@ -94,16 +93,12 @@ users:
    }
 
    operatorServiceAccount(
-    kubernetesCluster: model.KubernetesCluster, 
+    kubernetesCluster: GcpKubernetesCluster, 
     serviceAccountName: string, 
     namespace: k8s.core.v1.Namespace): k8s.core.v1.ServiceAccount{
 
-    if (!(kubernetesCluster instanceof GcpKubernetesCluster)) {
-      throw new Error("Invalid KubernetesCluster provided")
-    }
-
     // Create a Service Account with the IAM role annotated to use with the Pod.
-    const sa = new k8s.core.v1.ServiceAccount(
+    return new k8s.core.v1.ServiceAccount(
       serviceAccountName,
       {
         metadata: {
@@ -111,13 +106,11 @@ users:
           name: serviceAccountName
         },
       }, { provider: kubernetesCluster.k8sProvider});
-
-    return sa;
   }
 
   // Direct connectivity between GKE and Cloud SQL via a private IP is only possible 
   // if using a Native VPC cluster otherwise the Cloud SQL proxy is required.
-  createCloudSQLInstance(): model.JdbcDatabaseInstance {
+  createCloudSQLInstance(): CloudSQLDatabaseInstance {
     const networkId = `projects/${ gcp.config.project }/global/networks/default`; 
     const privateIpAddress = new gcp.compute.GlobalAddress("akka-private-ip-address", {
       purpose: "VPC_PEERING",
