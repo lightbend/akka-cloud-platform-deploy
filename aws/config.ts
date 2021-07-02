@@ -1,29 +1,60 @@
+import * as eks from "@pulumi/eks";
+import * as aws from "@pulumi/aws";
+import * as awsx from "@pulumi/awsx";
 import * as pulumi from "@pulumi/pulumi";
 
 const config = new pulumi.Config();
 
-// couldn't get generics working here with `config.get<T>(key)`
-function getStringOrDefault(key: string, def: string): string {
-  let ret = config.get<string>(key);
-  if (ret == undefined) {
-    ret = def;
-  }
-  return ret;
-}
-
 function getBooleanOrDefault(key: string, def: boolean): boolean {
-  let ret = config.getBoolean(key);
-  if (ret == undefined) {
-    ret = def;
-  }
-  return ret; 
+  const ret = config.getBoolean(key);
+  return ret == undefined ? def : ret;
 }
 
-export const AwsCloud = "aws";
 export const LightbendNamespace = "lightbend";
 
-export const cloud = getStringOrDefault("cloud", AwsCloud);
-export const operatorNamespace = getStringOrDefault("operator-namespace", LightbendNamespace);
+export const vpcArgs: awsx.ec2.VpcArgs = {
+  numberOfAvailabilityZones: config.getNumber("vpc-numberOfAvailabilityZones") || 2
+}
+
+export const eksClusterOptions: eks.ClusterOptions = {
+  // Kubernetes 1.20 is the current latest for EKS. For up to date information
+  // see https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html
+  version: config.get<string>("eks-kubernetes-version") || "1.20"
+}
+
+export const clusterNodeGroupOptions: eks.ClusterNodeGroupOptions = {
+  desiredCapacity: config.getNumber("eks-kubernetes-node-desiredCapacity") || 3,
+  minSize: config.getNumber("eks-kubernetes-node-minSize") || 1,
+  maxSize: config.getNumber("eks-kubernetes-node-maxSize") || 4,
+}
+
+export function mksClusterOptions(vpc: awsx.ec2.Vpc, securityGroup: aws.ec2.SecurityGroup, kms: aws.kms.Key): aws.msk.ClusterArgs {
+  return {
+    // See the list of supported Kafka versions here:
+    // https://docs.aws.amazon.com/msk/latest/developerguide/supported-kafka-versions.html
+    kafkaVersion: config.get<string>("msk-kafka-version") || "2.8.0",
+    numberOfBrokerNodes: config.getNumber("msk-kafka-numberOfBrokerNodes") || 2,
+    brokerNodeGroupInfo: {
+      // See the list of supported instance types here:
+      // https://docs.aws.amazon.com/msk/latest/developerguide/msk-create-cluster.html#broker-instance-types
+      instanceType: config.get<string>("msk-kafka-brokerNodeGroupInfo-instanceType") || "kafka.m5.large",
+      ebsVolumeSize: config.getNumber("msk-kafka-brokerNodeGroupInfo-ebsVolumeSize") || 1000,
+      clientSubnets: vpc.publicSubnetIds,
+      securityGroups: [securityGroup.id],
+    },
+    encryptionInfo: {
+      encryptionAtRestKmsKeyArn: kms.arn,
+      encryptionInTransit: {
+        // Possible values are described here:
+        // https://www.pulumi.com/docs/reference/pkg/aws/msk/cluster/#clusterencryptioninfoencryptionintransit
+        clientBroker: config.get<string>("msk-kafka-encryptionInfo-encryptionInTransit") || "TLS_PLAINTEXT"
+      }
+    }
+  }
+}
+
+export const operatorNamespace = config.get<string>("operator-namespace") || LightbendNamespace;
+
 export const installMetricsServer = getBooleanOrDefault("install-metrics-server", true);
 export const deployKafkaCluster = getBooleanOrDefault("deploy-kafka-cluster", true);
 export const deployJdbcDatabase = getBooleanOrDefault("deploy-jdbc-database", true);

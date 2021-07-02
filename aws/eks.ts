@@ -7,6 +7,7 @@ import * as random from "@pulumi/random";
 
 import * as model from "./model";
 import * as util from "./util";
+import * as config from "./config"
 
 class EksKubernetesCluster implements model.KubernetesCluster {
   vpc: awsx.ec2.Vpc;
@@ -102,7 +103,6 @@ const mskFireHoseRole: string = JSON.stringify({
 
 export class AwsCloud implements model.Cloud {
 
-
   /**
    * Creates a role and attaches the EKS worker node IAM managed policies.
    */
@@ -126,9 +126,8 @@ export class AwsCloud implements model.Cloud {
    * Creates an EKS cluster and its nodegroup.
    */
   createKubernetesCluster(): model.KubernetesCluster {
-    // fixme: add number of az's to configuration, tie to MSK and RDS config for azs?
     // Create a VPC for our cluster.
-    const vpc = new awsx.ec2.Vpc(util.name("vpc"), { numberOfAvailabilityZones: 2 });
+    const vpc = new awsx.ec2.Vpc(util.name("vpc"), config.vpcArgs);
 
     // Now create the roles and instance profiles for the two worker groups.
     const workersRole = this.createNodeGroupRole(util.name("workers-role"));
@@ -137,20 +136,16 @@ export class AwsCloud implements model.Cloud {
     // create the EKS cluster
     // https://www.pulumi.com/docs/reference/pkg/aws/eks/cluster/
     const cluster = new eks.Cluster(util.name("eks"), {
+      ...config.eksClusterOptions,
       skipDefaultNodeGroup: true,
       createOidcProvider: true,
       instanceRoles: [ workersRole ],
       vpcId: vpc.id,
       subnetIds: vpc.publicSubnetIds,
-      // fixme: add to configuration
-      version: "1.17",
     });
 
     const nodeGroup = cluster.createNodeGroup(util.name("workers-ng"), {
-      // fixme: use configuration
-      desiredCapacity: 3,
-      minSize: 1,
-      maxSize: 4,
+      ...config.clusterNodeGroupOptions,
       labels: {"ondemand": "true"},
       instanceProfile: workersInstanceProfile,
     });
@@ -236,7 +231,7 @@ export class AwsCloud implements model.Cloud {
 
     // give all the K8s nodegroup securitygroups full ingress access to MSK securitygroup for brokers
     const nodeSecurityGroups = eksKubernetesCluster.nodeGroups.map(ng => ng.nodeSecurityGroup.id);
-    const sg = new aws.ec2.SecurityGroup(util.name("msk-sg"), {
+    const securityGroup = new aws.ec2.SecurityGroup(util.name("msk-sg"), {
       vpcId: eksKubernetesCluster.vpc.id,
       ingress: [{
         description: "EKS NodeGroups ingress",
@@ -265,28 +260,7 @@ export class AwsCloud implements model.Cloud {
     });
     // https://www.pulumi.com/docs/reference/pkg/aws/msk/cluster/#cluster
     const kafkaCluster = new aws.msk.Cluster(mskName, {
-      // fixme: add to configuration
-      kafkaVersion: "2.8.0",
-      // fixme: add to configuration
-      // must be multiple of number of subnets. default VPC has 2
-      numberOfBrokerNodes: 2,
-      brokerNodeGroupInfo: {
-        // fixme: add to configuration
-        instanceType: "kafka.m5.large",
-        // fixme: add to configuration
-        ebsVolumeSize: 1000,
-        clientSubnets: eksKubernetesCluster.vpc.publicSubnetIds,
-        securityGroups: [sg.id],
-      },
-      encryptionInfo: {
-        encryptionAtRestKmsKeyArn: kms.arn,
-        encryptionInTransit: {
-          // fixme: add to configuration
-          // enable TLS and PLAINTEXT client connections
-          // https://www.pulumi.com/docs/reference/pkg/aws/msk/cluster/#clusterencryptioninfoencryptionintransit
-          clientBroker: "TLS_PLAINTEXT"
-        }
-      },
+      ...config.mksClusterOptions(eksKubernetesCluster.vpc, securityGroup, kms),
       openMonitoring: {
         prometheus: {
           jmxExporter: {
@@ -364,15 +338,15 @@ export class AwsCloud implements model.Cloud {
     const clusterInstances: aws.rds.ClusterInstance[] = [];
     const rdsInstanceName = util.name("rds-inst");
 
-    for (const range = {value: 0}; range.value < 2; range.value++) {
-      clusterInstances.push(new aws.rds.ClusterInstance(`${rdsInstanceName}-${range.value}`, {
-        identifier: `${rdsInstanceName}-${range.value}`,
+    for(let index = 0; index < 2; index++) {
+      clusterInstances.push(new aws.rds.ClusterInstance(`${rdsInstanceName}-${index}`, {
+        identifier: `${rdsInstanceName}-${index}`,
         clusterIdentifier: auroraCluster.id,
         instanceClass: "db.r4.large",
         engine: auroraEngine,
         engineVersion: auroraCluster.engineVersion,
       }));
-    }    
+    }
 
     return new AuroraRdsDatabase(auroraCluster);
   }
