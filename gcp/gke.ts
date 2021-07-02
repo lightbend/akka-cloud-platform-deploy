@@ -51,7 +51,7 @@ export class GcpCloud implements model.Cloud {
      });
 
      // separate node pool
-     const primaryPreemptibleNodes = new gcp.container.NodePool("primarynodes", {
+     new gcp.container.NodePool("primarynodes", {
        location: gcp.config.zone,
        cluster: cluster.name,
        initialNodeCount: config.initialNodeCountInCluster,
@@ -109,16 +109,14 @@ users:
    operatorServiceAccount(
     kubernetesCluster: model.KubernetesCluster, 
     serviceAccountName: string, 
-    namespace: k8s.core.v1.Namespace) {
+    namespace: k8s.core.v1.Namespace): k8s.core.v1.ServiceAccount{
 
     if (!(kubernetesCluster instanceof GcpKubernetesCluster)) {
       throw new Error("Invalid KubernetesCluster provided")
     }
 
-    let gkeCluster = (kubernetesCluster as GcpKubernetesCluster).cluster;
-
     // Create a Service Account with the IAM role annotated to use with the Pod.
-    let sa = new k8s.core.v1.ServiceAccount(
+    const sa = new k8s.core.v1.ServiceAccount(
       serviceAccountName,
       {
         metadata: {

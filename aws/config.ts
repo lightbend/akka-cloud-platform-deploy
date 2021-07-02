@@ -1,6 +1,6 @@
 import * as pulumi from "@pulumi/pulumi";
 
-let config = new pulumi.Config();
+const config = new pulumi.Config();
 
 // couldn't get generics working here with `config.get<T>(key)`
 function getStringOrDefault(key: string, def: string): string {

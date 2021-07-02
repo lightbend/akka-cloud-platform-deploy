@@ -13,10 +13,10 @@ if (config.cloud == config.AwsCloud)
 else
   throw new Error(`invalid cloud configuration: ${config.cloud}`);
 
-let cluster: model.KubernetesCluster = cloud.createKubernetesCluster();
+const cluster: model.KubernetesCluster = cloud.createKubernetesCluster();
 
 // K8s namespace for operator
-let namespaceName = config.operatorNamespace;
+const namespaceName = config.operatorNamespace;
 
 // Output the cluster's kubeconfig and name
 export const kubeconfig = cluster.kubeconfig;
@@ -24,14 +24,14 @@ export const clusterName = cluster.name;
 
 // Install k8s metrics-server
 if (config.installMetricsServer) {
-  const metricsServer = new k8s.yaml.ConfigGroup("metrics-server",
+  new k8s.yaml.ConfigGroup("metrics-server",
     { files: "https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.4.4/components.yaml" },
     { provider: cluster.k8sProvider },
   );
 }
 
 // Create a k8s namespace for operator
-let namespace = new k8s.core.v1.Namespace(namespaceName, {
+const namespace = new k8s.core.v1.Namespace(namespaceName, {
   metadata: {
     // fixme: add to configuration, if DNE let pulumi generate random suffix?
     // otherwise pulumi will append a random suffix to the namespace.. might be useful for integration testing to do that
@@ -42,12 +42,11 @@ let namespace = new k8s.core.v1.Namespace(namespaceName, {
 // Operator namespace name
 export const operatorNamespace = namespace.metadata.name;
 
-let serviceAccountName = util.name("sa");
-
-let serviceAccount = cloud.operatorServiceAccount(cluster, serviceAccountName, namespace);
+const serviceAccountName = util.name("sa");
+cloud.operatorServiceAccount(cluster, serviceAccountName, namespace);
 
 // Install Akka Cloud Platform Helm Chart
-let akkaPlatformOperatorChart = new k8s.helm.v3.Chart("akka-operator", {
+new k8s.helm.v3.Chart("akka-operator", {
   chart: "akka-operator",
   namespace: namespace.metadata.name,
   version: "1.1.19", // # fixme: add to configuration, omit `version` field to get latest
@@ -72,7 +71,7 @@ if (config.deployKafkaCluster) {
 
   // K8s secret with bootstrap.servers connection string
   bootstrapServersSecretName = util.name("kafka-secret");
-  let bootstrapServersSecret = new k8s.core.v1.Secret(bootstrapServersSecretName, {
+  new k8s.core.v1.Secret(bootstrapServersSecretName, {
     metadata: {
       name: bootstrapServersSecretName,
       namespace: namespace.metadata.name
@@ -95,7 +94,7 @@ if (config.deployJdbcDatabase) {
   jdbc = cloud.createJdbcCluster(cluster);
 
   jdbcSecretName = util.name("jdbc-secret");
-  let jdbcSecretResource = new k8s.core.v1.Secret(jdbcSecretName, {
+  new k8s.core.v1.Secret(jdbcSecretName, {
     metadata: {
       name: jdbcSecretName,
       namespace: namespace.metadata.name
