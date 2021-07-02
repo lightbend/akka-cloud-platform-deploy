@@ -1,3 +1,4 @@
+name: Build / Code Validations
 on:
   push:
     branches:
@@ -8,7 +9,7 @@ jobs:
   lint-and-build:
     runs-on: ubuntu-20.04
     steps:
-      - uses: action/checkout@v2
+      - uses: actions/checkout@v2
       - uses: actions/cache@v2
         with:
           path: ~/.npm
