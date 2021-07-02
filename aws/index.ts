@@ -40,12 +40,8 @@ cloud.operatorServiceAccount(cluster, serviceAccountName, namespace);
 
 // Install Akka Cloud Platform Helm Chart
 new k8s.helm.v3.Chart("akka-operator", {
-  chart: "akka-operator",
+  ...config.akkaOperatorChartOpts,
   namespace: namespace.metadata.name,
-  version: "1.1.19", // # fixme: add to configuration, omit `version` field to get latest
-  fetchOpts: {
-    repo: "https://lightbend.github.io/akka-operator-helm/"
-  },
   // chart values don't support shorthand value assignment syntax i.e. `serviceAccount.name: "foo"`
   values: { // fixme merge in chart value config from pulumi config
     serviceAccount: {
