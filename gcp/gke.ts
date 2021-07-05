@@ -50,7 +50,7 @@ export class GcpCloud {
      });
 
      // separate node pool
-     new gcp.container.NodePool("primarynodes", config.nodePoolArgs(cluster.name.get(), gcp.config.zone));
+     new gcp.container.NodePool("primarynodes", config.gkeNodePoolArgs(cluster.name.get(), gcp.config.zone));
 
      const kubeconfig = pulumi.
          all([ cluster.name, cluster.endpoint, cluster.masterAuth ]).
@@ -93,8 +93,8 @@ users:
    }
 
    operatorServiceAccount(
-    kubernetesCluster: GcpKubernetesCluster, 
-    serviceAccountName: string, 
+    kubernetesCluster: GcpKubernetesCluster,
+    serviceAccountName: string,
     namespace: k8s.core.v1.Namespace): k8s.core.v1.ServiceAccount{
 
     // Create a Service Account with the IAM role annotated to use with the Pod.
@@ -108,17 +108,17 @@ users:
       }, { provider: kubernetesCluster.k8sProvider});
   }
 
-  // Direct connectivity between GKE and Cloud SQL via a private IP is only possible 
+  // Direct connectivity between GKE and Cloud SQL via a private IP is only possible
   // if using a Native VPC cluster otherwise the Cloud SQL proxy is required.
   createCloudSQLInstance(): CloudSQLDatabaseInstance {
-    const networkId = `projects/${ gcp.config.project }/global/networks/default`; 
+    const networkId = `projects/${ gcp.config.project }/global/networks/default`;
     const privateIpAddress = new gcp.compute.GlobalAddress("akka-private-ip-address", {
       purpose: "VPC_PEERING",
       addressType: "INTERNAL",
       prefixLength: 16,
       network: networkId
     }, {});
-    
+
     const privateVpcConnection = new gcp.servicenetworking.Connection("akka-private-vpc-connection", {
       network: networkId,
       service: "servicenetworking.googleapis.com",

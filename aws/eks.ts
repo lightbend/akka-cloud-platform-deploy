@@ -126,7 +126,7 @@ export class AwsCloud {
    */
   createKubernetesCluster(): EksKubernetesCluster {
     // Create a VPC for our cluster.
-    const vpc = new awsx.ec2.Vpc(util.name("vpc"), config.vpcArgs);
+    const vpc = new awsx.ec2.Vpc(util.name("vpc"), config.eksVpcArgs);
 
     // Now create the roles and instance profiles for the two worker groups.
     const workersRole = this.createNodeGroupRole(util.name("workers-role"));
@@ -144,7 +144,7 @@ export class AwsCloud {
     });
 
     const nodeGroup = cluster.createNodeGroup(util.name("workers-ng"), {
-      ...config.clusterNodeGroupOptions,
+      ...config.eksClusterNodeGroupOptions,
       labels: {"ondemand": "true"},
       instanceProfile: workersInstanceProfile,
     });
@@ -159,8 +159,8 @@ export class AwsCloud {
    * Based on example: https://github.com/pulumi/pulumi-eks/blob/v0.30.0/examples/oidc-iam-sa/index.ts
    */
   operatorServiceAccount(
-    kubernetesCluster: EksKubernetesCluster, 
-    serviceAccountName: string, 
+    kubernetesCluster: EksKubernetesCluster,
+    serviceAccountName: string,
     namespace: k8s.core.v1.Namespace): k8s.core.v1.ServiceAccount {
 
     const eksCluster = kubernetesCluster.cluster;
@@ -250,7 +250,7 @@ export class AwsCloud {
     });
     // https://www.pulumi.com/docs/reference/pkg/aws/msk/cluster/#cluster
     const kafkaCluster = new aws.msk.Cluster(mskName, {
-      ...config.mksClusterOptions(kubernetesCluster.vpc, securityGroup, kms),
+      ...config.mksClusterArgs(kubernetesCluster.vpc, securityGroup, kms),
       openMonitoring: {
         prometheus: {
           jmxExporter: {

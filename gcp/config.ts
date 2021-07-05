@@ -23,7 +23,7 @@ export const akkaOperatorChartOpts: ChartOpts = {
   },
 };
 
-export function nodePoolArgs(
+export function gkeNodePoolArgs(
   clusterName: string,
   zone: string | undefined
 ): gcp.container.NodePoolArgs {
