@@ -22,15 +22,15 @@ jobs:
       - run: npm install
       - name: npm lint
         run: npx eslint . --ext .ts
-      - name: /aws typescript build 
+      - name: /aws typescript build
         run: |
           pushd aws
           npm install
-          npx tsc --build
+          npm run build
           popd
-      - name: /gcp typescript build 
+      - name: /gcp typescript build
         run: |
           pushd gcp
           npm install
-          npx tsc --build
+          npm run build
           popd
