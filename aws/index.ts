@@ -17,20 +17,25 @@ export const clusterName = cluster.name;
 
 // Install k8s metrics-server
 if (config.installMetricsServer) {
-  new k8s.yaml.ConfigGroup("metrics-server",
+  new k8s.yaml.ConfigGroup(
+    "metrics-server",
     { files: "https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.4.4/components.yaml" },
     { provider: cluster.k8sProvider },
   );
 }
 
 // Create a k8s namespace for operator
-const namespace = new k8s.core.v1.Namespace(namespaceName, {
-  metadata: {
-    // fixme: add to configuration, if DNE let pulumi generate random suffix?
-    // otherwise pulumi will append a random suffix to the namespace.. might be useful for integration testing to do that
-    name: namespaceName 
-  }
-}, {provider: cluster.k8sProvider});
+const namespace = new k8s.core.v1.Namespace(
+  namespaceName,
+  {
+    metadata: {
+      // fixme: add to configuration, if DNE let pulumi generate random suffix?
+      // otherwise pulumi will append a random suffix to the namespace.. might be useful for integration testing to do that
+      name: namespaceName,
+    },
+  },
+  { provider: cluster.k8sProvider },
+);
 
 // Operator namespace name
 export const operatorNamespace = namespace.metadata.name;
@@ -39,36 +44,43 @@ const serviceAccountName = util.name("sa");
 cloud.operatorServiceAccount(cluster, serviceAccountName, namespace);
 
 // Install Akka Cloud Platform Helm Chart
-new k8s.helm.v3.Chart("akka-operator", {
-  ...config.akkaOperatorChartOpts,
-  namespace: namespace.metadata.name,
-  // chart values don't support shorthand value assignment syntax i.e. `serviceAccount.name: "foo"`
-  values: { // fixme merge in chart value config from pulumi config
-    serviceAccount: {
-      name: serviceAccountName
-    }
-  }
-}, { provider: cluster.k8sProvider});
-
+new k8s.helm.v3.Chart(
+  "akka-operator",
+  {
+    ...config.akkaOperatorChartOpts,
+    namespace: namespace.metadata.name,
+    // chart values don't support shorthand value assignment syntax i.e. `serviceAccount.name: "foo"`
+    values: {
+      // fixme merge in chart value config from pulumi config
+      serviceAccount: {
+        name: serviceAccountName,
+      },
+    },
+  },
+  { provider: cluster.k8sProvider },
+);
 
 let bootstrapServersSecretName: string | null = null;
 let kafkaCluster: eks.MskKafkaCluster | null = null;
 
 if (config.deployKafkaCluster) {
-
   kafkaCluster = cloud.createKafkaCluster(cluster);
 
   // K8s secret with bootstrap.servers connection string
   bootstrapServersSecretName = util.name("kafka-secret");
-  new k8s.core.v1.Secret(bootstrapServersSecretName, {
-    metadata: {
-      name: bootstrapServersSecretName,
-      namespace: namespace.metadata.name
+  new k8s.core.v1.Secret(
+    bootstrapServersSecretName,
+    {
+      metadata: {
+        name: bootstrapServersSecretName,
+        namespace: namespace.metadata.name,
+      },
+      stringData: {
+        bootstrapServers: kafkaCluster.bootstrapBrokers,
+      },
     },
-    stringData: {
-      bootstrapServers: kafkaCluster.bootstrapBrokers
-    }
-  }, {provider: cluster.k8sProvider});
+    { provider: cluster.k8sProvider },
+  );
 }
 
 export const kafkaZookeeperConnectString = kafkaCluster?.zookeeperConnectString;
@@ -83,17 +95,21 @@ if (config.deployJdbcDatabase) {
   jdbc = cloud.createJdbcCluster(cluster);
 
   jdbcSecretName = util.name("jdbc-secret");
-  new k8s.core.v1.Secret(jdbcSecretName, {
-    metadata: {
-      name: jdbcSecretName,
-      namespace: namespace.metadata.name
+  new k8s.core.v1.Secret(
+    jdbcSecretName,
+    {
+      metadata: {
+        name: jdbcSecretName,
+        namespace: namespace.metadata.name,
+      },
+      stringData: {
+        username: jdbc.username,
+        password: jdbc.password,
+        connectionUrl: pulumi.interpolate`jdbc:postgresql://${jdbc.endpoint}:5432/`,
+      },
     },
-    stringData: {
-      username: jdbc.username,
-      password: jdbc.password,
-      connectionUrl: pulumi.interpolate `jdbc:postgresql://${jdbc.endpoint}:5432/`
-    }
-  }, {provider: cluster.k8sProvider});
+    { provider: cluster.k8sProvider },
+  );
 }
 
 export const jdbcClusterId = jdbc?.clusterId;
