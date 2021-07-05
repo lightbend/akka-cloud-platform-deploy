@@ -13,7 +13,7 @@ function getBooleanOrDefault(key: string, def: boolean): boolean {
 
 export const LightbendNamespace = "lightbend";
 
-export const vpcArgs: awsx.ec2.VpcArgs = {
+export const eksVpcArgs: awsx.ec2.VpcArgs = {
   numberOfAvailabilityZones: config.getNumber("vpc-numberOfAvailabilityZones") || 2
 }
 
@@ -23,13 +23,13 @@ export const eksClusterOptions: eks.ClusterOptions = {
   version: config.get<string>("eks-kubernetes-version") || "1.20"
 }
 
-export const clusterNodeGroupOptions: eks.ClusterNodeGroupOptions = {
+export const eksClusterNodeGroupOptions: eks.ClusterNodeGroupOptions = {
   desiredCapacity: config.getNumber("eks-kubernetes-node-desiredCapacity") || 3,
   minSize: config.getNumber("eks-kubernetes-node-minSize") || 1,
   maxSize: config.getNumber("eks-kubernetes-node-maxSize") || 4,
 }
 
-export function mksClusterOptions(vpc: awsx.ec2.Vpc, securityGroup: aws.ec2.SecurityGroup, kms: aws.kms.Key): aws.msk.ClusterArgs {
+export function mksClusterArgs(vpc: awsx.ec2.Vpc, securityGroup: aws.ec2.SecurityGroup, kms: aws.kms.Key): aws.msk.ClusterArgs {
   return {
     // See the list of supported Kafka versions here:
     // https://docs.aws.amazon.com/msk/latest/developerguide/supported-kafka-versions.html
