@@ -23,10 +23,7 @@ export const akkaOperatorChartOpts: ChartOpts = {
   },
 };
 
-export function gkeNodePoolArgs(
-  clusterName: string,
-  zone: string | undefined
-): gcp.container.NodePoolArgs {
+export function gkeNodePoolArgs(clusterName: string, zone: string | undefined): gcp.container.NodePoolArgs {
   return {
     cluster: clusterName,
     location: zone,
@@ -43,10 +40,7 @@ export function gkeNodePoolArgs(
   };
 }
 
-export function databaseInstanceArgs(
-  project: string | undefined,
-  networkId: string
-): gcp.sql.DatabaseInstanceArgs {
+export function databaseInstanceArgs(project: string | undefined, networkId: string): gcp.sql.DatabaseInstanceArgs {
   return {
     databaseVersion: config.get<string>("db-version") || "POSTGRES_13",
     project: project,

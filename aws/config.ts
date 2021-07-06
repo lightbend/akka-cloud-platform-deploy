@@ -14,22 +14,26 @@ function getBooleanOrDefault(key: string, def: boolean): boolean {
 export const LightbendNamespace = "lightbend";
 
 export const eksVpcArgs: awsx.ec2.VpcArgs = {
-  numberOfAvailabilityZones: config.getNumber("vpc-numberOfAvailabilityZones") || 2
-}
+  numberOfAvailabilityZones: config.getNumber("vpc-numberOfAvailabilityZones") || 2,
+};
 
 export const eksClusterOptions: eks.ClusterOptions = {
   // Kubernetes 1.20 is the current latest for EKS. For up to date information
   // see https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html
-  version: config.get<string>("eks-kubernetes-version") || "1.20"
-}
+  version: config.get<string>("eks-kubernetes-version") || "1.20",
+};
 
 export const eksClusterNodeGroupOptions: eks.ClusterNodeGroupOptions = {
   desiredCapacity: config.getNumber("eks-kubernetes-node-desiredCapacity") || 3,
   minSize: config.getNumber("eks-kubernetes-node-minSize") || 1,
   maxSize: config.getNumber("eks-kubernetes-node-maxSize") || 4,
-}
+};
 
-export function mksClusterArgs(vpc: awsx.ec2.Vpc, securityGroup: aws.ec2.SecurityGroup, kms: aws.kms.Key): aws.msk.ClusterArgs {
+export function mksClusterArgs(
+  vpc: awsx.ec2.Vpc,
+  securityGroup: aws.ec2.SecurityGroup,
+  kms: aws.kms.Key,
+): aws.msk.ClusterArgs {
   return {
     // See the list of supported Kafka versions here:
     // https://docs.aws.amazon.com/msk/latest/developerguide/supported-kafka-versions.html
@@ -48,19 +52,19 @@ export function mksClusterArgs(vpc: awsx.ec2.Vpc, securityGroup: aws.ec2.Securit
       encryptionInTransit: {
         // Possible values are described here:
         // https://www.pulumi.com/docs/reference/pkg/aws/msk/cluster/#clusterencryptioninfoencryptionintransit
-        clientBroker: config.get<string>("msk-kafka-encryptionInfo-encryptionInTransit") || "TLS_PLAINTEXT"
-      }
-    }
-  }
+        clientBroker: config.get<string>("msk-kafka-encryptionInfo-encryptionInTransit") || "TLS_PLAINTEXT",
+      },
+    },
+  };
 }
 
 export const akkaOperatorChartOpts: ChartOpts = {
   chart: "akka-operator",
   version: config.get<string>("operator-version") || "1.1.19",
   fetchOpts: {
-    repo: "https://lightbend.github.io/akka-operator-helm/"
-  }
-}
+    repo: "https://lightbend.github.io/akka-operator-helm/",
+  },
+};
 
 export const operatorNamespace = config.get<string>("operator-namespace") || LightbendNamespace;
 
