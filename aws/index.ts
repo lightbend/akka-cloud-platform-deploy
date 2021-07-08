@@ -2,8 +2,11 @@ import * as pulumi from "@pulumi/pulumi";
 import * as k8s from "@pulumi/kubernetes";
 
 import * as config from "./config";
+import * as fs from "fs";
 import * as eks from "./eks";
 import * as util from "./util";
+import { LoadBalancer } from "@pulumi/awsx/lb";
+import { ServiceSpecType } from "@pulumi/kubernetes/core/v1";
 
 const cloud = new eks.AwsCloud();
 const cluster: eks.EksKubernetesCluster = cloud.createKubernetesCluster();
@@ -37,28 +40,27 @@ const namespace = new k8s.core.v1.Namespace(
   { provider: cluster.k8sProvider },
 );
 
-// Operator namespace name
-export const operatorNamespace = namespace.metadata.name;
+if (config.installAkkaOperator) {
+  const serviceAccountName = util.name("sa");
+  cloud.operatorServiceAccount(cluster, serviceAccountName, namespace);
 
-const serviceAccountName = util.name("sa");
-cloud.operatorServiceAccount(cluster, serviceAccountName, namespace);
-
-// Install Akka Cloud Platform Helm Chart
-new k8s.helm.v3.Chart(
-  "akka-operator",
-  {
-    ...config.akkaOperatorChartOpts,
-    namespace: namespace.metadata.name,
-    // chart values don't support shorthand value assignment syntax i.e. `serviceAccount.name: "foo"`
-    values: {
-      // fixme merge in chart value config from pulumi config
-      serviceAccount: {
-        name: serviceAccountName,
+  // Install Akka Cloud Platform Helm Chart
+  new k8s.helm.v3.Chart(
+    "akka-operator",
+    {
+      ...config.akkaOperatorChartOpts,
+      namespace: namespace.metadata.name,
+      // chart values don't support shorthand value assignment syntax i.e. `serviceAccount.name: "foo"`
+      values: {
+        // fixme merge in chart value config from pulumi config
+        serviceAccount: {
+          name: serviceAccountName,
+        },
       },
     },
-  },
-  { provider: cluster.k8sProvider },
-);
+    { provider: cluster.k8sProvider },
+  );
+}
 
 let bootstrapServersSecretName: string | null = null;
 let kafkaCluster: eks.MskKafkaCluster | null = null;
@@ -118,3 +120,99 @@ export const jdbcPassword = jdbc?.password;
 export const jdbcEndpoint = jdbc?.endpoint;
 export const jdbcReaderEndpoint = jdbc?.readerEndpoint;
 export const jdbcSecret = jdbcSecretName;
+
+// AWS OTel Collector
+if (config.installAwsOTelCollector) {
+
+  // Create an AWS OTel Collector namespace
+  const namespaceName = config.awsOTelCollectorNamespace;
+  const namespace = new k8s.core.v1.Namespace(
+    namespaceName,
+    {
+      metadata: {
+        name: namespaceName,
+      },
+    },
+    { provider: cluster.k8sProvider },
+  );
+
+  const awsOTelCollector = "aws-otel-collector";
+  const awsOTelCollectorLabels = { app: awsOTelCollector };
+
+  // AWS OTel Collector Configuration. Read from the `otel-agent-config.yaml` file.
+  const localConfig = "otel-agent-config.yaml"
+  const podConfig = "config.yaml"
+  const podMountFolder = "/etc/otel-agent-config"
+  const podMountPath = podMountFolder + "/" + podConfig
+  const awsOTelConfigMap = new k8s.core.v1.ConfigMap(awsOTelCollector, {
+    metadata: { 
+      namespace: namespaceName,
+      labels: awsOTelCollectorLabels,
+      name: "aws-otel-config.yaml"
+    },
+    data: { [podConfig]: fs.readFileSync(localConfig).toString() },
+  }, { provider: cluster.k8sProvider });
+  const awsOTelConfigMapName = awsOTelConfigMap.metadata.name
+
+  const configVolumeName = "config"
+  const zipkinPort = 9411
+  const healthCheckPort = 13133 // default health-check port, can be overridden in `otel-agent-config.yaml` in the health_check section
+
+  // Create an AWS OTel Collector deployment
+  const awsOTelCollectorDeployment = new k8s.apps.v1.Deployment(`${awsOTelCollector}-dep`, {
+      metadata: { 
+        namespace: namespaceName,
+        labels: awsOTelCollectorLabels,
+      },
+      spec: {
+          minReadySeconds: 5,
+          progressDeadlineSeconds: 120,
+          replicas: 1,
+          selector: { matchLabels: awsOTelCollectorLabels },
+          template: {
+              metadata: { labels: awsOTelCollectorLabels },
+              spec: {
+                  containers: [{
+                      name: awsOTelCollector,
+                      image: "amazon/aws-otel-collector:latest",
+                      command: [ "/awscollector" ],
+                      args: ["--config=" + podMountPath, "--log-level=DEBUG"], //TODO debug
+                      volumeMounts: [{ name: configVolumeName, mountPath: podMountFolder }],
+                      resources: {
+                        limits: {
+                          cpu:  "256m",
+                          memory: "512Mi"
+                        },
+                        requests: {
+                          cpu: "32m",
+                          memory: "24Mi"
+                        }
+                      },
+                      ports: [{ name: "zipkin", containerPort: zipkinPort, hostPort: zipkinPort }],
+                      livenessProbe: { httpGet: { path: "/", port: healthCheckPort } },
+                      readinessProbe: { httpGet: { path: "/", port: healthCheckPort } },
+                    }],
+                  volumes: [{
+                      name: configVolumeName,
+                      configMap: { name: awsOTelConfigMapName }
+                  }],
+              }
+          }
+      },
+  }, { provider: cluster.k8sProvider });
+  
+  // Create an AWS OTel Collector service
+  const awsOTelCollectorService = new k8s.core.v1.Service(`${awsOTelCollector}-svc`, {
+      metadata: { 
+        labels: awsOTelCollectorLabels,
+        namespace: namespaceName
+      },
+      spec: {
+          type: ServiceSpecType.ClusterIP,
+          ports: [ { name: "zipkin", port: zipkinPort, targetPort: zipkinPort } ],
+          selector: awsOTelCollectorLabels,
+      },
+  }, { provider: cluster.k8sProvider });
+
+}
+
