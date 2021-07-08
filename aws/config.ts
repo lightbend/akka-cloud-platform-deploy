@@ -12,6 +12,7 @@ function getBooleanOrDefault(key: string, def: boolean): boolean {
 }
 
 export const LightbendNamespace = "lightbend";
+export const AwsOTelCollectorNamespace = "aws-otel-collector";
 
 export const eksVpcArgs: awsx.ec2.VpcArgs = {
   numberOfAvailabilityZones: config.getNumber("vpc-numberOfAvailabilityZones") || 2,
@@ -69,5 +70,9 @@ export const akkaOperatorChartOpts: ChartOpts = {
 export const operatorNamespace = config.get<string>("operator-namespace") || LightbendNamespace;
 
 export const installMetricsServer = getBooleanOrDefault("install-metrics-server", true);
+export const installAkkaOperator = getBooleanOrDefault("install-akka-operator", true);
 export const deployKafkaCluster = getBooleanOrDefault("deploy-kafka-cluster", true);
 export const deployJdbcDatabase = getBooleanOrDefault("deploy-jdbc-database", true);
+
+export const installAwsOTelCollector = getBooleanOrDefault("install-aws-otel-collector", true);
+export const awsOTelCollectorNamespace = config.get<string>("aws-otel-collector-namespace") || AwsOTelCollectorNamespace;

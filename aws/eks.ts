@@ -7,6 +7,7 @@ import * as random from "@pulumi/random";
 
 import * as util from "./util";
 import * as config from "./config";
+import { clusterName } from ".";
 
 export class EksKubernetesCluster {
   vpc: awsx.ec2.Vpc;
