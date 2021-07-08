@@ -122,7 +122,16 @@ export class AwsCloud {
    */
   createKubernetesCluster(): EksKubernetesCluster {
     // Create a VPC for our cluster.
-    const vpc = new awsx.ec2.Vpc(util.name("vpc"), config.eksVpcArgs);
+    const vpcName = util.name("vpc");
+    const vpc = new awsx.ec2.Vpc(vpcName, {
+      ...config.eksVpcArgs,
+      tags: {
+        // Tags help to later identify the VPC using AWS CLI or UI.
+        Name: vpcName,
+        "Pulumi:Stack": pulumi.getStack(),
+        "Pulumi:Project": pulumi.getProject(),
+      },
+    });
 
     // Now create the roles and instance profiles for the two worker groups.
     const workersRole = this.createNodeGroupRole(util.name("workers-role"));
