@@ -145,7 +145,7 @@ if (config.installAwsOTelCollector) {
   const podMountFolder = "/etc/otel-agent-config"
   const podMountPath = podMountFolder + "/" + podConfig
   const awsOTelConfigMap = new k8s.core.v1.ConfigMap(awsOTelCollector, {
-    metadata: { 
+    metadata: {
       namespace: namespaceName,
       labels: awsOTelCollectorLabels,
       name: "aws-otel-config.yaml"
@@ -176,7 +176,10 @@ if (config.installAwsOTelCollector) {
                       name: awsOTelCollector,
                       image: "amazon/aws-otel-collector:latest",
                       command: [ "/awscollector" ],
-                      args: ["--config=" + podMountPath, "--log-level=DEBUG"], //TODO debug
+                      args: [
+                        "--config=" + podMountPath, 
+                        // "--log-level=DEBUG"
+                      ],
                       volumeMounts: [{ name: configVolumeName, mountPath: podMountFolder }],
                       resources: {
                         limits: {
@@ -188,9 +191,16 @@ if (config.installAwsOTelCollector) {
                           memory: "24Mi"
                         }
                       },
-                      ports: [{ name: "zipkin", containerPort: zipkinPort, hostPort: zipkinPort }],
+                      ports: [{ containerPort: zipkinPort }],
                       livenessProbe: { httpGet: { path: "/", port: healthCheckPort } },
                       readinessProbe: { httpGet: { path: "/", port: healthCheckPort } },
+                      env: [
+                        // AWS region and credentials to connect to XRay
+                        // TODO check that all credentials are set
+                        { name: "AWS_REGION", value: config.awsXRayRegion },
+                        { name: "AWS_ACCESS_KEY_ID", value: config.awsXRayAccessKeyID },
+                        { name: "AWS_SECRET_ACCESS_KEY", value: config.awsXRaySecretAccessKey }
+                      ]
                     }],
                   volumes: [{
                       name: configVolumeName,
@@ -208,8 +218,8 @@ if (config.installAwsOTelCollector) {
         namespace: namespaceName
       },
       spec: {
-          type: ServiceSpecType.ClusterIP,
-          ports: [ { name: "zipkin", port: zipkinPort, targetPort: zipkinPort } ],
+          type: ServiceSpecType.LoadBalancer,
+          ports: [ { port: zipkinPort } ],
           selector: awsOTelCollectorLabels,
       },
   }, { provider: cluster.k8sProvider });
