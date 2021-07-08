@@ -58,6 +58,53 @@ new k8s.helm.v3.Chart(
   { provider: cluster.k8sProvider },
 );
 
+if (config.installTelemetryServices) {
+  // Install Prometheus Helm Chart
+  // https://prometheus-community.github.io/helm-charts/
+  new k8s.helm.v3.Chart(
+    "prometheus",
+    {
+      chart: "prometheus",
+      fetchOpts: {
+        repo: "https://prometheus-community.github.io/helm-charts",
+      },
+      // Prometheus defaults are good enough for Lightbend Telemetry, so we don't need to customize values here.
+      // If you need to change something, you can check the available chart values by running:
+      // $ helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+      // $ helm show values prometheus-community/prometheus
+    },
+    { provider: cluster.k8sProvider },
+  );
+
+  // Install Grafana Helm Chart
+  // https://grafana.github.io/helm-charts
+  new k8s.helm.v3.Chart(
+    "grafana",
+    {
+      chart: "grafana",
+      fetchOpts: {
+        repo: "https://grafana.github.io/helm-charts",
+      },
+      values: {
+        datasources: {
+          "datasources.yaml": {
+            datasources: [
+              {
+                name: "Cinnamon Prometheus",
+                type: "prometheus",
+                access: "proxy",
+                url: "http://prometheus-server.default.svc.cluster.local",
+                editable: true,
+              },
+            ],
+          },
+        },
+      },
+    },
+    { provider: cluster.k8sProvider },
+  );
+}
+
 let bootstrapServersSecretName: string | null = null;
 let kafkaCluster: eks.MskKafkaCluster | null = null;
 

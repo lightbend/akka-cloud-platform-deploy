@@ -89,3 +89,4 @@ if (installAwsOTelCollector) {
   config.require(awsXRayAccessKeyIDName);
   config.requireSecret(awsXRaySecretAccessKeyName);
 }
+export const installTelemetryServices = getBooleanOrDefault("install-telemetry-services", true);

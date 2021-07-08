@@ -23,7 +23,7 @@ export class EksKubernetesCluster {
     this.kubeconfig = cluster.kubeconfig;
     this.name = cluster.eksCluster.id;
     this.nodeGroups = nodeGroups;
-    this.k8sProvider = new k8s.Provider("eks-k8s", {
+    this.k8sProvider = new k8s.Provider(util.name("eks-k8s"), {
       kubeconfig: this.kubeconfig.apply(JSON.stringify),
     });
   }
