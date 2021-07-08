@@ -15,19 +15,19 @@ export const LightbendNamespace = "lightbend";
 export const AwsOTelCollectorNamespace = "aws-otel-collector";
 
 export const eksVpcArgs: awsx.ec2.VpcArgs = {
-  numberOfAvailabilityZones: config.getNumber("vpc-numberOfAvailabilityZones") || 2,
+  numberOfAvailabilityZones: config.getNumber("vpc.numberOfAvailabilityZones") || 2,
 };
 
 export const eksClusterOptions: eks.ClusterOptions = {
   // Kubernetes 1.20 is the current latest for EKS. For up to date information
   // see https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html
-  version: config.get<string>("eks-kubernetes-version") || "1.20",
+  version: config.get<string>("eks.kubernetes.version") || "1.20",
 };
 
 export const eksClusterNodeGroupOptions: eks.ClusterNodeGroupOptions = {
-  desiredCapacity: config.getNumber("eks-kubernetes-node-desiredCapacity") || 3,
-  minSize: config.getNumber("eks-kubernetes-node-minSize") || 1,
-  maxSize: config.getNumber("eks-kubernetes-node-maxSize") || 4,
+  desiredCapacity: config.getNumber("eks.kubernetes.node.desiredCapacity") || 3,
+  minSize: config.getNumber("eks.kubernetes.node.minSize") || 1,
+  maxSize: config.getNumber("eks.kubernetes.node.maxSize") || 4,
 };
 
 export function mksClusterArgs(
@@ -38,13 +38,13 @@ export function mksClusterArgs(
   return {
     // See the list of supported Kafka versions here:
     // https://docs.aws.amazon.com/msk/latest/developerguide/supported-kafka-versions.html
-    kafkaVersion: config.get<string>("msk-kafka-version") || "2.8.0",
-    numberOfBrokerNodes: config.getNumber("msk-kafka-numberOfBrokerNodes") || 2,
+    kafkaVersion: config.get<string>("msk.kafka.version") || "2.8.0",
+    numberOfBrokerNodes: config.getNumber("msk.kafka.numberOfBrokerNodes") || 2,
     brokerNodeGroupInfo: {
       // See the list of supported instance types here:
       // https://docs.aws.amazon.com/msk/latest/developerguide/msk-create-cluster.html#broker-instance-types
-      instanceType: config.get<string>("msk-kafka-brokerNodeGroupInfo-instanceType") || "kafka.m5.large",
-      ebsVolumeSize: config.getNumber("msk-kafka-brokerNodeGroupInfo-ebsVolumeSize") || 1000,
+      instanceType: config.get<string>("msk.kafka.brokerNodeGroupInfo.instanceType") || "kafka.m5.large",
+      ebsVolumeSize: config.getNumber("msk.kafka.brokerNodeGroupInfo.ebsVolumeSize") || 1000,
       clientSubnets: vpc.publicSubnetIds,
       securityGroups: [securityGroup.id],
     },
@@ -53,7 +53,7 @@ export function mksClusterArgs(
       encryptionInTransit: {
         // Possible values are described here:
         // https://www.pulumi.com/docs/reference/pkg/aws/msk/cluster/#clusterencryptioninfoencryptionintransit
-        clientBroker: config.get<string>("msk-kafka-encryptionInfo-encryptionInTransit") || "TLS_PLAINTEXT",
+        clientBroker: config.get<string>("msk.kafka.encryptionInfo.encryptionInTransit") || "TLS_PLAINTEXT",
       },
     },
   };
@@ -61,18 +61,18 @@ export function mksClusterArgs(
 
 export const akkaOperatorChartOpts: ChartOpts = {
   chart: "akka-operator",
-  version: config.get<string>("operator-version") || "1.1.19",
+  version: config.get<string>("akka.operator.version") || "1.1.19",
   fetchOpts: {
     repo: "https://lightbend.github.io/akka-operator-helm/",
   },
 };
 
-export const operatorNamespace = config.get<string>("operator-namespace") || LightbendNamespace;
+export const operatorNamespace = config.get<string>("akka.operator.namespace") || LightbendNamespace;
 
-export const installMetricsServer = getBooleanOrDefault("install-metrics-server", true);
+export const installMetricsServer = getBooleanOrDefault("kubernetes.metrics-server.install", true);
 export const akkaOperatorServiceAccount = config.get<string>("akka-operator-service-account") || "sa";
-export const deployKafkaCluster = getBooleanOrDefault("deploy-kafka-cluster", true);
-export const deployJdbcDatabase = getBooleanOrDefault("deploy-jdbc-database", true);
+export const deployKafkaCluster = getBooleanOrDefault("mks.createCluster", true);
+export const deployJdbcDatabase = getBooleanOrDefault("rds.createCluster", true);
 
 export const installAwsOTelCollector = getBooleanOrDefault("install-aws-otel-collector", false);
 export const awsOTelCollectorNamespace =
@@ -89,4 +89,4 @@ if (installAwsOTelCollector) {
   config.require(awsXRayAccessKeyIDName);
   config.requireSecret(awsXRaySecretAccessKeyName);
 }
-export const installTelemetryServices = getBooleanOrDefault("install-telemetry-services", true);
+export const installTelemetryServices = getBooleanOrDefault("akka.operator.installTelemetryBackends", true);
