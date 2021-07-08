@@ -12,12 +12,12 @@ exporters:
   logging:
     loglevel: debug
   awsxray:
-    region: 'us-west-2'
 
 service:
   pipelines:
     traces:
       receivers: [zipkin]
       processors: [batch]
-      exporters: [logging, awsxray]
+      # exporters: [logging, awsxray]
+      exporters: [awsxray]
   extensions: [health_check]
