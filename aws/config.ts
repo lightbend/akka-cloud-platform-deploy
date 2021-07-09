@@ -74,7 +74,8 @@ export const installAkkaOperator = getBooleanOrDefault("install-akka-operator", 
 export const deployKafkaCluster = getBooleanOrDefault("deploy-kafka-cluster", true);
 export const deployJdbcDatabase = getBooleanOrDefault("deploy-jdbc-database", true);
 
-export const awsOTelCollectorNamespace = config.get<string>("aws-otel-collector-namespace") || AwsOTelCollectorNamespace;
+export const awsOTelCollectorNamespace =
+  config.get<string>("aws-otel-collector-namespace") || AwsOTelCollectorNamespace;
 export const installAwsOTelCollector = getBooleanOrDefault("install-aws-otel-collector", true);
 
 export const awsXRayRegion = config.get<string>("aws-xray-region"); // TODO maybe default to the current aws:region
