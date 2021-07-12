@@ -169,10 +169,11 @@ if (config.installAwsOTelCollector) {
 
   // Create an AWS OTel Collector deployment
   new k8s.apps.v1.Deployment(
-    `${awsOTelCollector}-dep`,
+    awsOTelCollector,
     {
       metadata: {
         namespace: namespaceName,
+        name: awsOTelCollector,
         labels: awsOTelCollectorLabels,
       },
       spec: {
