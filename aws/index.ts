@@ -126,7 +126,7 @@ export let awsOTelCollectorServiceEndpoint: string | null = null;
 if (config.installAwsOTelCollector) {
   // Create an AWS OTel Collector namespace
   const namespaceName = config.awsOTelCollectorNamespace;
-  const namespace = new k8s.core.v1.Namespace(
+  new k8s.core.v1.Namespace(
     namespaceName,
     {
       metadata: {
@@ -162,13 +162,13 @@ if (config.installAwsOTelCollector) {
   const zipkinPort = 9411;
   const healthCheckPort = 13133; // default health-check port, can be overridden in `otel-agent-config.yaml` in the health_check section
 
-  let collectorArgs = ["--config=" + podMountPath];
+  const collectorArgs = ["--config=" + podMountPath];
   if (config.awsOTelCollectorDebug) {
     collectorArgs.push("--log-level=DEBUG");
   }
 
   // Create an AWS OTel Collector deployment
-  const awsOTelCollectorDeployment = new k8s.apps.v1.Deployment(
+  new k8s.apps.v1.Deployment(
     `${awsOTelCollector}-dep`,
     {
       metadata: {
@@ -225,9 +225,9 @@ if (config.installAwsOTelCollector) {
   );
 
   // Create an AWS OTel Collector service
-  let serviceName = `${awsOTelCollector}-svc`;
+  const serviceName = `${awsOTelCollector}-svc`;
 
-  let awsOTelCollectorService = new k8s.core.v1.Service(
+  new k8s.core.v1.Service(
     serviceName,
     {
       metadata: {
