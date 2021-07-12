@@ -1,15 +1,19 @@
 extensions:
   health_check:
+    # This port must correspond to healthCheckPort declared in index.ts
     endpoint: 0.0.0.0:13133
 
 receivers:
   zipkin:
+    # This port must correspond to zipkinPort declared in index.ts
+    endpoint: 0.0.0.0:9411
 
 processors:
   batch:
 
 exporters:
   logging:
+    # Defines log level for the logging exporter
     loglevel: debug
   awsxray:
 
@@ -18,6 +22,6 @@ service:
     traces:
       receivers: [zipkin]
       processors: [batch]
-      # exporters: [logging, awsxray]
+      # HINT: add the logging exporter to get traces logged to the collector output, e.g [logging, awsxray]
       exporters: [awsxray]
   extensions: [health_check]

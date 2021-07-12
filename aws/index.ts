@@ -5,7 +5,6 @@ import * as config from "./config";
 import * as fs from "fs";
 import * as eks from "./eks";
 import * as util from "./util";
-import { LoadBalancer } from "@pulumi/awsx/lb";
 import { ServiceSpecType } from "@pulumi/kubernetes/core/v1";
 
 const cloud = new eks.AwsCloud();
@@ -121,6 +120,8 @@ export const jdbcEndpoint = jdbc?.endpoint;
 export const jdbcReaderEndpoint = jdbc?.readerEndpoint;
 export const jdbcSecret = jdbcSecretName;
 
+export let awsOTelCollectorServiceEndpoint: string | null = null;
+
 // AWS OTel Collector
 if (config.installAwsOTelCollector) {
   // Create an AWS OTel Collector namespace
@@ -161,6 +162,11 @@ if (config.installAwsOTelCollector) {
   const zipkinPort = 9411;
   const healthCheckPort = 13133; // default health-check port, can be overridden in `otel-agent-config.yaml` in the health_check section
 
+  let collectorArgs = ["--config=" + podMountPath];
+  if (config.awsOTelCollectorDebug) {
+    collectorArgs.push("--log-level=DEBUG");
+  }
+
   // Create an AWS OTel Collector deployment
   const awsOTelCollectorDeployment = new k8s.apps.v1.Deployment(
     `${awsOTelCollector}-dep`,
@@ -182,10 +188,7 @@ if (config.installAwsOTelCollector) {
                 name: awsOTelCollector,
                 image: "amazon/aws-otel-collector:latest",
                 command: ["/awscollector"],
-                args: [
-                  "--config=" + podMountPath,
-                  // "--log-level=DEBUG"
-                ],
+                args: collectorArgs,
                 volumeMounts: [{ name: configVolumeName, mountPath: podMountFolder }],
                 resources: {
                   limits: {
@@ -202,7 +205,6 @@ if (config.installAwsOTelCollector) {
                 readinessProbe: { httpGet: { path: "/", port: healthCheckPort } },
                 env: [
                   // AWS region and credentials to connect to XRay
-                  // TODO check that all credentials are set
                   { name: "AWS_REGION", value: config.awsXRayRegion },
                   { name: "AWS_ACCESS_KEY_ID", value: config.awsXRayAccessKeyID },
                   { name: "AWS_SECRET_ACCESS_KEY", value: config.awsXRaySecretAccessKey },
@@ -223,19 +225,24 @@ if (config.installAwsOTelCollector) {
   );
 
   // Create an AWS OTel Collector service
-  const awsOTelCollectorService = new k8s.core.v1.Service(
-    `${awsOTelCollector}-svc`,
+  let serviceName = `${awsOTelCollector}-svc`;
+
+  let awsOTelCollectorService = new k8s.core.v1.Service(
+    serviceName,
     {
       metadata: {
         labels: awsOTelCollectorLabels,
+        name: serviceName,
         namespace: namespaceName,
       },
       spec: {
-        type: ServiceSpecType.LoadBalancer,
+        type: ServiceSpecType.ClusterIP,
         ports: [{ port: zipkinPort }],
         selector: awsOTelCollectorLabels,
       },
     },
     { provider: cluster.k8sProvider },
   );
+
+  awsOTelCollectorServiceEndpoint = `${serviceName}.${namespaceName}.svc.cluster.local`;
 }
