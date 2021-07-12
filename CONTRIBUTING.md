@@ -30,3 +30,21 @@ Update `package.json`:
 ncu -u
 npm install
 ```
+
+# Auto-format TypeScript
+
+In order to auto-format TypeScript sources.
+
+First install npm dependencies with:
+
+```bash
+npm install
+```
+
+And then use the `format` command:
+
+```bash
+npm run format
+```
+
+> Note that this command has to be run from the root folder of the project.
