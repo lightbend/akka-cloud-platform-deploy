@@ -13,5 +13,8 @@
         "lint": "eslint . --ext .ts",
         "format-check": "prettier --check --parser typescript **/*.ts",
         "format": "prettier --parser typescript --write **/*.ts"
+    },
+    "dependencies": {
+        "@types/js-yaml": "^4.0.2"
     }
 }

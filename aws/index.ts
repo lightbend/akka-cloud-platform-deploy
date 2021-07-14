@@ -2,10 +2,9 @@ import * as pulumi from "@pulumi/pulumi";
 import * as k8s from "@pulumi/kubernetes";
 
 import * as config from "./config";
-import * as fs from "fs";
+import * as awsOTelConfig from "./otelconfig";
 import * as eks from "./eks";
 import * as util from "./util";
-import { ServiceSpecType } from "@pulumi/kubernetes/core/v1";
 
 const cloud = new eks.AwsCloud();
 const cluster: eks.EksKubernetesCluster = cloud.createKubernetesCluster();
@@ -39,27 +38,25 @@ const namespace = new k8s.core.v1.Namespace(
   { provider: cluster.k8sProvider },
 );
 
-if (config.installAkkaOperator) {
-  const serviceAccountName = util.name("sa");
-  cloud.operatorServiceAccount(cluster, serviceAccountName, namespace);
+const serviceAccountName = util.name("sa");
+cloud.operatorServiceAccount(cluster, serviceAccountName, namespace);
 
-  // Install Akka Cloud Platform Helm Chart
-  new k8s.helm.v3.Chart(
-    "akka-operator",
-    {
-      ...config.akkaOperatorChartOpts,
-      namespace: namespace.metadata.name,
-      // chart values don't support shorthand value assignment syntax i.e. `serviceAccount.name: "foo"`
-      values: {
-        // fixme merge in chart value config from pulumi config
-        serviceAccount: {
-          name: serviceAccountName,
-        },
+// Install Akka Cloud Platform Helm Chart
+new k8s.helm.v3.Chart(
+  "akka-operator",
+  {
+    ...config.akkaOperatorChartOpts,
+    namespace: namespace.metadata.name,
+    // chart values don't support shorthand value assignment syntax i.e. `serviceAccount.name: "foo"`
+    values: {
+      // fixme merge in chart value config from pulumi config
+      serviceAccount: {
+        name: serviceAccountName,
       },
     },
-    { provider: cluster.k8sProvider },
-  );
-}
+  },
+  { provider: cluster.k8sProvider },
+);
 
 let bootstrapServersSecretName: string | null = null;
 let kafkaCluster: eks.MskKafkaCluster | null = null;
@@ -69,6 +66,7 @@ if (config.deployKafkaCluster) {
 
   // K8s secret with bootstrap.servers connection string
   bootstrapServersSecretName = util.name("kafka-secret");
+
   new k8s.core.v1.Secret(
     bootstrapServersSecretName,
     {
@@ -139,8 +137,7 @@ if (config.installAwsOTelCollector) {
   const awsOTelCollector = "aws-otel-collector";
   const awsOTelCollectorLabels = { app: awsOTelCollector };
 
-  // AWS OTel Collector Configuration. Read from the `otel-agent-config.yaml` file.
-  const localConfig = "otel-agent-config.yaml";
+  // AWS OTel Collector Configuration
   const podConfig = "config.yaml";
   const podMountFolder = "/etc/otel-agent-config";
   const podMountPath = podMountFolder + "/" + podConfig;
@@ -152,15 +149,18 @@ if (config.installAwsOTelCollector) {
         labels: awsOTelCollectorLabels,
         name: "aws-otel-config.yaml",
       },
-      data: { [podConfig]: fs.readFileSync(localConfig).toString() },
+      data: { [podConfig]: awsOTelConfig.readAwsOTelCollectorConfig() },
     },
     { provider: cluster.k8sProvider },
   );
   const awsOTelConfigMapName = awsOTelConfigMap.metadata.name;
 
   const configVolumeName = "config";
-  const zipkinPort = 9411;
-  const healthCheckPort = 13133; // default health-check port, can be overridden in `otel-agent-config.yaml` in the health_check section
+  const awsOTelCollectorConfig = awsOTelConfig.getAwsOTelCollectorConfig();
+  const zipkinPort = awsOTelCollectorConfig.zipkinPort;
+  pulumi.log.debug(`Zipkin port: ${zipkinPort}`);
+  const healthCheckPort = awsOTelCollectorConfig.healthCheckPort;
+  pulumi.log.debug(`Health check port: ${healthCheckPort}`);
 
   const collectorArgs = ["--config=" + podMountPath];
   if (config.awsOTelCollectorDebug) {
@@ -237,7 +237,7 @@ if (config.installAwsOTelCollector) {
         namespace: namespaceName,
       },
       spec: {
-        type: ServiceSpecType.ClusterIP,
+        type: k8s.core.v1.ServiceSpecType.ClusterIP,
         ports: [{ port: zipkinPort }],
         selector: awsOTelCollectorLabels,
       },
