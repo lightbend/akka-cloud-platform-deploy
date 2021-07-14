@@ -210,7 +210,7 @@ export class AwsCloud {
     });
 
     // Create a Service Account with the IAM role annotated to use with the Pod.
-    const sa = new k8s.core.v1.ServiceAccount(
+    return new k8s.core.v1.ServiceAccount(
       serviceAccountName,
       {
         metadata: {
@@ -223,8 +223,6 @@ export class AwsCloud {
       },
       { provider: kubernetesCluster.k8sProvider },
     );
-
-    return sa;
   }
 
   /**
@@ -324,30 +322,40 @@ export class AwsCloud {
     const auroraEngine = aws.rds.EngineType.AuroraPostgresql;
 
     // https://www.pulumi.com/docs/reference/pkg/aws/rds/cluster/
-    const auroraCluster = new aws.rds.Cluster(rdsName, {
-      backupRetentionPeriod: 5,
-      clusterIdentifier: rdsName,
-      engine: auroraEngine,
-      masterUsername: "postgres",
-      masterPassword: password.result,
-      preferredBackupWindow: "07:00-09:00",
-      dbSubnetGroupName: subnetGroup.id,
-      skipFinalSnapshot: true, // note: skips backup "snapshot" of db when pulumi stack is destroyed
-      vpcSecurityGroupIds: nodeSecurityGroups,
-    });
+    const auroraCluster = new aws.rds.Cluster(
+      rdsName,
+      {
+        backupRetentionPeriod: 5,
+        clusterIdentifier: rdsName,
+        engine: auroraEngine,
+        masterUsername: "postgres",
+        masterPassword: password.result,
+        preferredBackupWindow: "07:00-09:00",
+        dbSubnetGroupName: subnetGroup.id,
+        skipFinalSnapshot: true, // note: skips backup "snapshot" of db when pulumi stack is destroyed
+        vpcSecurityGroupIds: nodeSecurityGroups,
+      },
+      {
+        dependsOn: [vpc],
+      },
+    );
 
-    const clusterInstances: aws.rds.ClusterInstance[] = [];
     const rdsInstanceName = util.name("rds-inst");
 
     for (let index = 0; index < 2; index++) {
-      clusterInstances.push(
-        new aws.rds.ClusterInstance(`${rdsInstanceName}-${index}`, {
+      new aws.rds.ClusterInstance(
+        `${rdsInstanceName}-${index}`,
+        {
           identifier: `${rdsInstanceName}-${index}`,
           clusterIdentifier: auroraCluster.id,
           instanceClass: "db.r4.large",
           engine: auroraEngine,
           engineVersion: auroraCluster.engineVersion,
-        }),
+          dbSubnetGroupName: subnetGroup.id,
+        },
+        {
+          dependsOn: [auroraCluster],
+        },
       );
     }
 
