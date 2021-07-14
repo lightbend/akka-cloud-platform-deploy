@@ -51,8 +51,23 @@ export class GcpCloud {
     });
 
     // separate node pool
-    new gcp.container.NodePool("primarynodes", config.gkeNodePoolArgs(cluster.name.get(), gcp.config.zone));
+    const nodePool = new gcp.container.NodePool(
+      util.name("primary-node-pool"),
+      {
+        ...config.gkeNodePoolArgs(cluster.name, gcp.config.zone),
+        version: engineVersion,
+        management: {
+          autoRepair: true,
+        },
+      },
+      {
+        dependsOn: [cluster],
+      },
+    );
 
+    // Manufacture a GKE-style kubeconfig. Note that this is slightly "different"
+    // because of the way GKE requires gcloud to be in the picture for cluster
+    // authentication (rather than using the client cert/key directly).
     const kubeconfig = pulumi
       .all([cluster.name, cluster.endpoint, cluster.masterAuth])
       .apply(([name, endpoint, masterAuth]) => {
@@ -85,10 +100,16 @@ users:
       });
 
     // Create a Kubernetes provider instance that uses our cluster from above.
-    const clusterProvider = new k8s.Provider("gcp-k8s", {
-      kubeconfig: kubeconfig,
-      namespace: config.operatorNamespace,
-    });
+    const clusterProvider = new k8s.Provider(
+      util.name("gcp-k8s"),
+      {
+        kubeconfig: kubeconfig,
+        namespace: config.operatorNamespace,
+      },
+      {
+        dependsOn: [nodePool],
+      },
+    );
 
     return new GcpKubernetesCluster(cluster, kubeconfig, clusterProvider);
   }
