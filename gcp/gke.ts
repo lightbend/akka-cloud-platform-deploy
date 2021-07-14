@@ -3,6 +3,7 @@ import * as k8s from "@pulumi/kubernetes";
 import * as gcp from "@pulumi/gcp";
 
 import * as config from "./config";
+import * as util from "./utils";
 
 export class GcpKubernetesCluster {
   cluster: gcp.container.Cluster;
@@ -37,7 +38,7 @@ export class GcpCloud {
   createKubernetesCluster(): GcpKubernetesCluster {
     // Create a GKE cluster
     const engineVersion = gcp.container.getEngineVersions().then((v) => v.latestMasterVersion);
-    const cluster = new gcp.container.Cluster(config.clusterName, {
+    const cluster = new gcp.container.Cluster(util.name("gke"), {
       location: gcp.config.zone,
       initialNodeCount: 1,
       minMasterVersion: engineVersion,
