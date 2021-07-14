@@ -1,11 +1,9 @@
 extensions:
   health_check:
-    # This port must correspond to healthCheckPort declared in index.ts
     endpoint: 0.0.0.0:13133
 
 receivers:
   zipkin:
-    # This port must correspond to zipkinPort declared in index.ts
     endpoint: 0.0.0.0:9411
 
 processors:

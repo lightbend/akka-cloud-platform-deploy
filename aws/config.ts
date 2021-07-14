@@ -70,12 +70,11 @@ export const akkaOperatorChartOpts: ChartOpts = {
 export const operatorNamespace = config.get<string>("operator-namespace") || LightbendNamespace;
 
 export const installMetricsServer = getBooleanOrDefault("install-metrics-server", true);
-export const installAkkaOperator = getBooleanOrDefault("install-akka-operator", true);
 export const akkaOperatorServiceAccount = config.get<string>("akka-operator-service-account") || "sa";
 export const deployKafkaCluster = getBooleanOrDefault("deploy-kafka-cluster", true);
 export const deployJdbcDatabase = getBooleanOrDefault("deploy-jdbc-database", true);
 
-export const installAwsOTelCollector = getBooleanOrDefault("install-aws-otel-collector", true);
+export const installAwsOTelCollector = getBooleanOrDefault("install-aws-otel-collector", false);
 export const awsOTelCollectorNamespace =
   config.get<string>("aws-otel-collector-namespace") || AwsOTelCollectorNamespace;
 // enables debug loglevel for the AWS OTel collector
