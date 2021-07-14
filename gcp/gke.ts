@@ -137,7 +137,7 @@ users:
   createCloudSQLInstance(): CloudSQLDatabaseInstance {
     const networkId = `projects/${gcp.config.project}/global/networks/default`;
     const privateIpAddress = new gcp.compute.GlobalAddress(
-      "akka-private-ip-address",
+      util.name("akka-private-ip-address"),
       {
         purpose: "VPC_PEERING",
         addressType: "INTERNAL",
@@ -148,7 +148,7 @@ users:
     );
 
     const privateVpcConnection = new gcp.servicenetworking.Connection(
-      "akka-private-vpc-connection",
+      util.name("akka-private-vpc-connection"),
       {
         network: networkId,
         service: "servicenetworking.googleapis.com",
@@ -158,7 +158,7 @@ users:
     );
 
     const instance = new gcp.sql.DatabaseInstance(
-      "instance",
+      util.name("instance"),
       config.databaseInstanceArgs(gcp.config.project, networkId),
       { dependsOn: [privateVpcConnection] },
     );
