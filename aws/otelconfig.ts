@@ -1,9 +1,9 @@
 import yaml = require("js-yaml");
 import * as fs from "fs";
 
-export const awsOTelCollectorConfigFileName: string = "aws-otel-collector-config.yaml";
+export const awsOTelCollectorConfigFileName = "aws-otel-collector-config.yaml";
 
-let awsOTelCollectorConfig = yaml.load(fs.readFileSync(awsOTelCollectorConfigFileName).toString()) as OTelConfig;
+const awsOTelCollectorConfig = yaml.load(fs.readFileSync(awsOTelCollectorConfigFileName).toString()) as OTelConfig;
 
 class AwsOTelCollectorConfig {
   public zipkinPort: number = parseConfigPort(
