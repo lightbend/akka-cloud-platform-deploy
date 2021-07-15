@@ -61,7 +61,7 @@ export function mksClusterArgs(
 
 export const akkaOperatorChartOpts: ChartOpts = {
   chart: "akka-operator",
-  version: config.get<string>("akka.operator.version") || "1.1.19",
+  version: config.get<string>("akka.operator.version") || "1.1.21",
   fetchOpts: {
     repo: "https://lightbend.github.io/akka-operator-helm/",
   },
