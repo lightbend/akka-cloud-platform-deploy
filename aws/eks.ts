@@ -129,6 +129,7 @@ export class AwsCloud {
         Name: vpcName,
         "Pulumi:Stack": pulumi.getStack(),
         "Pulumi:Project": pulumi.getProject(),
+        "Pulumi:CreatedAt": new Date().toISOString(),
       },
     });
 
