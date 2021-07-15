@@ -70,23 +70,22 @@ export const akkaOperatorChartOpts: ChartOpts = {
 export const operatorNamespace = config.get<string>("akka.operator.namespace") || LightbendNamespace;
 
 export const installMetricsServer = getBooleanOrDefault("kubernetes.metrics-server.install", true);
-export const akkaOperatorServiceAccount = config.get<string>("akka-operator-service-account") || "sa";
 export const deployKafkaCluster = getBooleanOrDefault("mks.createCluster", true);
 export const deployJdbcDatabase = getBooleanOrDefault("rds.createCluster", true);
 
-export const installAwsOTelCollector = getBooleanOrDefault("install-aws-otel-collector", false);
-export const awsOTelCollectorNamespace =
-  config.get<string>("aws-otel-collector-namespace") || AwsOTelCollectorNamespace;
+export const installTelemetryServices = getBooleanOrDefault("akka.operator.installTelemetryBackends", true);
+
+export const installAwsOTelCollector = getBooleanOrDefault("otel.collector.install", false);
+export const awsOTelCollectorNamespace = config.get<string>("otel.collector.namespace") || AwsOTelCollectorNamespace;
 // enables debug loglevel for the AWS OTel collector
-export const awsOTelCollectorDebug = getBooleanOrDefault("aws-otel-collector-debug", false);
-export const awsXRayRegion = config.get<string>("aws-xray-region") || new pulumi.Config("aws").get<string>("region");
-const awsXRayAccessKeyIDName = "aws-xray-access-key-id";
+export const awsOTelCollectorDebug = getBooleanOrDefault("otel.collector.debug", false);
+export const awsXRayRegion = config.get<string>("xray.region") || new pulumi.Config("aws").get<string>("region");
+const awsXRayAccessKeyIDName = "xray.access-key-id";
 export const awsXRayAccessKeyID = config.get<string>(awsXRayAccessKeyIDName);
-const awsXRaySecretAccessKeyName = "aws-xray-secret-access-key";
+const awsXRaySecretAccessKeyName = "xray.secret-access-key";
 export const awsXRaySecretAccessKey = config.get<string>(awsXRaySecretAccessKeyName);
 if (installAwsOTelCollector) {
   pulumi.log.info("AWS X-Ray region: " + awsXRayRegion);
   config.require(awsXRayAccessKeyIDName);
   config.requireSecret(awsXRaySecretAccessKeyName);
 }
-export const installTelemetryServices = getBooleanOrDefault("akka.operator.installTelemetryBackends", true);
