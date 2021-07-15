@@ -7,7 +7,6 @@ import * as random from "@pulumi/random";
 
 import * as util from "./util";
 import * as config from "./config";
-import { clusterName } from ".";
 
 export class EksKubernetesCluster {
   vpc: awsx.ec2.Vpc;
@@ -158,7 +157,7 @@ export class AwsCloud {
   }
 
   /**
-   * Setup EKS pre-requisitite IAM configuration for service account used by operator.
+   * Setup EKS pre-requisites IAM configuration for service account used by operator.
    * This enables the operator to call the AWS Marketplace MeterUsage API to bill customers.
    *
    * Based on example: https://github.com/pulumi/pulumi-eks/blob/v0.30.0/examples/oidc-iam-sa/index.ts
