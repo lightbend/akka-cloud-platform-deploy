@@ -5,3 +5,4 @@
 Pulumi.*.yaml
 package-lock.json
 akka-cloud-deploy.code-workspace
+kubeconfig.yml
