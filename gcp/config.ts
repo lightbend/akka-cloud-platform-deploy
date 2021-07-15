@@ -48,10 +48,10 @@ export function gkeNodePoolArgs(
 
 export function databaseInstanceArgs(project: string | undefined, networkId: string): gcp.sql.DatabaseInstanceArgs {
   return {
-    databaseVersion: config.get<string>("clouSql.databaseVersion") || "POSTGRES_13",
+    databaseVersion: config.get<string>("cloudSql.databaseVersion") || "POSTGRES_13",
     project: project,
     settings: {
-      tier: config.get<string>("clouSql.settings.tier") || "db-f1-micro",
+      tier: config.get<string>("cloudSql.settings.tier") || "db-f1-micro",
       ipConfiguration: {
         ipv4Enabled: true,
         privateNetwork: networkId,
