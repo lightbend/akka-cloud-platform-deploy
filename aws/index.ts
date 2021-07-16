@@ -17,13 +17,11 @@ export const kubeconfig = cluster.kubeconfig;
 export const clusterName = cluster.name;
 
 // Install k8s metrics-server
-if (config.installMetricsServer) {
-  new k8s.yaml.ConfigGroup(
-    "metrics-server",
-    { files: "https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.4.4/components.yaml" },
-    { provider: cluster.k8sProvider },
-  );
-}
+new k8s.yaml.ConfigGroup(
+  "metrics-server",
+  { files: "https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.4.4/components.yaml" },
+  { provider: cluster.k8sProvider },
+);
 
 // Create a k8s namespace for operator
 const namespace = new k8s.core.v1.Namespace(
