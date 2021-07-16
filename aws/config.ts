@@ -69,7 +69,6 @@ export const akkaOperatorChartOpts: ChartOpts = {
 
 export const operatorNamespace = config.get<string>("akka.operator.namespace") || LightbendNamespace;
 
-export const installMetricsServer = getBooleanOrDefault("kubernetes.metrics-server.install", true);
 export const deployKafkaCluster = getBooleanOrDefault("mks.createCluster", true);
 export const deployJdbcDatabase = getBooleanOrDefault("rds.createCluster", true);
 
