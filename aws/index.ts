@@ -9,9 +9,6 @@ import * as util from "./util";
 const cloud = new eks.AwsCloud();
 const cluster: eks.EksKubernetesCluster = cloud.createKubernetesCluster();
 
-// K8s namespace for operator
-const namespaceName = config.operatorNamespace;
-
 // Output the cluster's kubeconfig and name
 export const kubeconfig = cluster.kubeconfig;
 export const clusterName = cluster.name;
@@ -25,12 +22,12 @@ new k8s.yaml.ConfigGroup(
 
 // Create a k8s namespace for operator
 const namespace = new k8s.core.v1.Namespace(
-  namespaceName,
+  config.AkkaOperator.Namespace,
   {
     metadata: {
       // fixme: add to configuration, if DNE let pulumi generate random suffix?
       // otherwise pulumi will append a random suffix to the namespace.. might be useful for integration testing to do that
-      name: namespaceName,
+      name: config.AkkaOperator.Namespace,
     },
   },
   { provider: cluster.k8sProvider },
@@ -43,7 +40,7 @@ cloud.operatorServiceAccount(cluster, serviceAccountName, namespace);
 new k8s.helm.v3.Chart(
   "akka-operator",
   {
-    ...config.akkaOperatorChartOpts,
+    ...config.AkkaOperator.CharOpts,
     namespace: namespace.metadata.name,
     // chart values don't support shorthand value assignment syntax i.e. `serviceAccount.name: "foo"`
     values: {
@@ -56,7 +53,7 @@ new k8s.helm.v3.Chart(
   { provider: cluster.k8sProvider },
 );
 
-if (config.installTelemetryServices) {
+if (config.Telemetry.InstallBackends) {
   // Install Prometheus Helm Chart
   // https://prometheus-community.github.io/helm-charts/
   new k8s.helm.v3.Chart(
@@ -106,7 +103,7 @@ if (config.installTelemetryServices) {
 let bootstrapServersSecretName: string | null = null;
 let kafkaCluster: eks.MskKafkaCluster | null = null;
 
-if (config.deployKafkaCluster) {
+if (config.Mks.DeployKafkaCluster) {
   kafkaCluster = cloud.createKafkaCluster(cluster);
 
   // K8s secret with bootstrap.servers connection string
@@ -135,7 +132,7 @@ export const kafkaBootstrapServerSecret = bootstrapServersSecretName;
 let jdbcSecretName: string | null = null;
 let jdbc: eks.AuroraRdsDatabase | null = null;
 
-if (config.deployJdbcDatabase) {
+if (config.Rds.CreateCluster) {
   jdbc = cloud.createJdbcCluster(cluster);
 
   jdbcSecretName = util.name("jdbc-secret");
@@ -166,14 +163,13 @@ export const jdbcSecret = jdbcSecretName;
 export let awsOTelCollectorServiceEndpoint: string | null = null;
 
 // AWS OTel Collector
-if (config.installAwsOTelCollector) {
+if (config.OpenTelemetry.Collector.InstallAwsOTelCollector) {
   // Create an AWS OTel Collector namespace
-  const namespaceName = config.awsOTelCollectorNamespace;
-  new k8s.core.v1.Namespace(
-    namespaceName,
+  const otelCollectorNamespace = new k8s.core.v1.Namespace(
+    config.OpenTelemetry.Collector.Namespace,
     {
       metadata: {
-        name: namespaceName,
+        name: config.OpenTelemetry.Collector.Namespace,
       },
     },
     { provider: cluster.k8sProvider },
@@ -190,14 +186,18 @@ if (config.installAwsOTelCollector) {
     awsOTelCollector,
     {
       metadata: {
-        namespace: namespaceName,
+        namespace: config.OpenTelemetry.Collector.Namespace,
         labels: awsOTelCollectorLabels,
         name: "aws-otel-config.yaml",
       },
       data: { [podConfig]: awsOTelConfig.readAwsOTelCollectorConfig() },
     },
-    { provider: cluster.k8sProvider },
+    {
+      provider: cluster.k8sProvider,
+      dependsOn: [otelCollectorNamespace],
+    },
   );
+
   const awsOTelConfigMapName = awsOTelConfigMap.metadata.name;
 
   const configVolumeName = "config";
@@ -208,7 +208,7 @@ if (config.installAwsOTelCollector) {
   pulumi.log.debug(`Health check port: ${healthCheckPort}`);
 
   const collectorArgs = ["--config=" + podMountPath];
-  if (config.awsOTelCollectorDebug) {
+  if (config.OpenTelemetry.Collector.Debug) {
     collectorArgs.push("--log-level=DEBUG");
   }
 
@@ -217,7 +217,7 @@ if (config.installAwsOTelCollector) {
     awsOTelCollector,
     {
       metadata: {
-        namespace: namespaceName,
+        namespace: config.OpenTelemetry.Collector.Namespace,
         name: awsOTelCollector,
         labels: awsOTelCollectorLabels,
       },
@@ -251,9 +251,9 @@ if (config.installAwsOTelCollector) {
                 readinessProbe: { httpGet: { path: "/", port: healthCheckPort } },
                 env: [
                   // AWS region and credentials to connect to XRay
-                  { name: "AWS_REGION", value: config.awsXRayRegion },
-                  { name: "AWS_ACCESS_KEY_ID", value: config.awsXRayAccessKeyID },
-                  { name: "AWS_SECRET_ACCESS_KEY", value: config.awsXRaySecretAccessKey },
+                  { name: "AWS_REGION", value: config.OpenTelemetry.Xray.Region },
+                  { name: "AWS_ACCESS_KEY_ID", value: config.OpenTelemetry.Xray.AccessKeyId },
+                  { name: "AWS_SECRET_ACCESS_KEY", value: config.OpenTelemetry.Xray.SecretAccessKey },
                 ],
               },
             ],
@@ -267,7 +267,10 @@ if (config.installAwsOTelCollector) {
         },
       },
     },
-    { provider: cluster.k8sProvider },
+    {
+      provider: cluster.k8sProvider,
+      dependsOn: [otelCollectorNamespace],
+    },
   );
 
   // Create an AWS OTel Collector service
@@ -279,7 +282,7 @@ if (config.installAwsOTelCollector) {
       metadata: {
         labels: awsOTelCollectorLabels,
         name: serviceName,
-        namespace: namespaceName,
+        namespace: config.OpenTelemetry.Collector.Namespace,
       },
       spec: {
         type: k8s.core.v1.ServiceSpecType.ClusterIP,
@@ -287,8 +290,11 @@ if (config.installAwsOTelCollector) {
         selector: awsOTelCollectorLabels,
       },
     },
-    { provider: cluster.k8sProvider },
+    {
+      provider: cluster.k8sProvider,
+      dependsOn: [otelCollectorNamespace],
+    },
   );
 
-  awsOTelCollectorServiceEndpoint = `${serviceName}.${namespaceName}.svc.cluster.local`;
+  awsOTelCollectorServiceEndpoint = `${serviceName}.${config.OpenTelemetry.Collector.Namespace}.svc.cluster.local`;
 }
