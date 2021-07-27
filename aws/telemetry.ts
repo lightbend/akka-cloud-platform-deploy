@@ -59,7 +59,7 @@ class Grafana {
       const dir = Grafana.DashboardDownloadDir;
       fs.mkdir(dir, { recursive: true }, (err) => {
         if (err) {
-          reject(`Failed to create directory ${dir}. Error: ${err}`);
+          reject(new Error(`Failed to create directory ${dir}. Error: ${err}`));
         } else {
           resolve(dir);
         }
@@ -71,14 +71,14 @@ class Grafana {
     return new Promise((resolve, reject) => {
       https.get(Grafana.DashboardsUrl, (response) => {
         if (response.statusCode != 200) {
-          reject(`Expected HTTP Status 200 but got ${response.statusCode}`);
+          reject(new Error(`Expected HTTP Status 200 but got ${response.statusCode}`));
         } else {
           const downloadedFile = `${dir}/${Grafana.DashboardsFile}`;
           const writeStream = fs.createWriteStream(downloadedFile);
 
           response.pipe(writeStream);
           writeStream.on("finish", () => resolve(downloadedFile));
-          response.on("error", (err: Error) => reject(`Could not download file: ${err}`));
+          response.on("error", (err: Error) => reject(err));
         }
       });
     });
@@ -94,7 +94,7 @@ class Grafana {
           .map((entry) => new Dashboard(entry.name.replace(".json", ""), entry.getData().toString("utf8")));
         resolve(dashboards);
       } catch (err) {
-        reject(`Could not read ${file} zip file: ${err}`);
+        reject(new Error(`Could not read ${file} zip file: ${err}`));
       }
     });
   }
