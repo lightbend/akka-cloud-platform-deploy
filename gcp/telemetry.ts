@@ -62,7 +62,7 @@ class Prometheus {
 
 class Grafana {
   private static readonly DashboardsFile = `cinnamon-grafana-prometheus-${config.Telemetry.Version}.zip`;
-  private static readonly DashboardsUrl = `https://downloads.lightbend.com/cinnamon/grafana/cinnamon-grafana-prometheus-${config.Telemetry.Version}.zip`;
+  private static readonly DashboardsUrl = `https://downloads.lightbend.com/cinnamon/grafana/${Grafana.DashboardsFile}`;
   private static readonly DashboardDownloadDir: string = `${path.resolve()}/downloads`;
 
   private createDashboardDirectory(): Promise<string> {
