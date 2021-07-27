@@ -28,6 +28,10 @@ class Versions {
   // See the list of supported Kafka versions here:
   // https://docs.aws.amazon.com/msk/latest/developerguide/supported-kafka-versions.html
   static readonly KafkaVersion: string = "2.8.0";
+
+  // See the latest version for Lightbend Telemetry (Cinnamon) here:
+  // https://developer.lightbend.com/docs/telemetry/current/project/release-notes.html
+  static readonly Cinnamon: string = "2.16.1";
 }
 
 export class Eks {
@@ -118,6 +122,7 @@ export class Rds {
 
 export class Telemetry {
   static readonly InstallBackends = getBooleanOrDefault("akka.operator.installTelemetryBackends", true);
+  static readonly Version = Versions.Cinnamon;
 }
 
 export class OpenTelemetry {
@@ -139,10 +144,12 @@ export class OpenTelemetry {
     SecretAccessKey: config.get<string>(OpenTelemetry.XrayKeys.SecretAccessKey),
   };
 
-  static initializationCheck() {
-    pulumi.log.info(`AWS X-Ray region: ${OpenTelemetry.Xray.Region}`);
-    config.require(OpenTelemetry.XrayKeys.AccessKeyId);
-    config.requireSecret(OpenTelemetry.XrayKeys.SecretAccessKey);
+  static initializationCheck(): void {
+    if (OpenTelemetry.Collector.InstallAwsOTelCollector) {
+      pulumi.log.info(`AWS X-Ray region: ${OpenTelemetry.Xray.Region}`);
+      config.require(OpenTelemetry.XrayKeys.AccessKeyId);
+      config.requireSecret(OpenTelemetry.XrayKeys.SecretAccessKey);
+    }
   }
 }
 
