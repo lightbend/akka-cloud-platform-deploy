@@ -32,11 +32,11 @@ const serviceAccountName = utils.name("sa");
 cloud.operatorServiceAccount(cluster, serviceAccountName, namespace);
 
 // Install the license key into the namespace
-// new k8s.yaml.ConfigGroup(
-//   "license-secret",
-//   { files: config.AkkaOperator.LicenseFile },
-//   { provider: cluster.k8sProvider },
-// );
+new k8s.yaml.ConfigGroup(
+  "license-secret",
+  { files: config.AkkaOperator.LicenseFile },
+  { provider: cluster.k8sProvider },
+);
 
 // Install the GCP Marketplace applications CRD in the cluster
 new k8s.yaml.ConfigGroup(
