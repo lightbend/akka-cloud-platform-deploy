@@ -4,6 +4,9 @@
         "module": "esnext",
         "target": "es2020",
         "moduleResolution": "Node",
-        "outDir": "bin"
+        "outDir": "bin",
+        "noFallthroughCasesInSwitch": true,
+        "noImplicitReturns": true,
+        "forceConsistentCasingInFileNames": true
     }
 }
