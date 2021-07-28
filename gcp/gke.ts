@@ -52,9 +52,9 @@ export class GcpCloud {
 
     // separate node pool
     const nodePool = new gcp.container.NodePool(
-      util.name("primary-node-pool"),
+      util.name("primary-np"),
       {
-        ...config.gkeNodePoolArgs(cluster.name, gcp.config.zone),
+        ...config.Gke.nodePoolArgs(cluster.name, gcp.config.zone),
         version: engineVersion,
         management: {
           autoRepair: true,
@@ -104,7 +104,7 @@ users:
       util.name("gcp-k8s"),
       {
         kubeconfig: kubeconfig,
-        namespace: config.operatorNamespace,
+        namespace: config.AkkaOperator.Namespace,
       },
       {
         dependsOn: [nodePool],
@@ -136,30 +136,22 @@ users:
   // if using a Native VPC cluster otherwise the Cloud SQL proxy is required.
   createCloudSQLInstance(): CloudSQLDatabaseInstance {
     const networkId = `projects/${gcp.config.project}/global/networks/default`;
-    const privateIpAddress = new gcp.compute.GlobalAddress(
-      util.name("akka-private-ip-address"),
-      {
-        purpose: "VPC_PEERING",
-        addressType: "INTERNAL",
-        prefixLength: 16,
-        network: networkId,
-      },
-      {},
-    );
+    const privateIpAddress = new gcp.compute.GlobalAddress(util.name("akka-private-ip-address"), {
+      purpose: "VPC_PEERING",
+      addressType: "INTERNAL",
+      prefixLength: 16,
+      network: networkId,
+    });
 
-    const privateVpcConnection = new gcp.servicenetworking.Connection(
-      util.name("akka-private-vpc-connection"),
-      {
-        network: networkId,
-        service: "servicenetworking.googleapis.com",
-        reservedPeeringRanges: [privateIpAddress.name],
-      },
-      {},
-    );
+    const privateVpcConnection = new gcp.servicenetworking.Connection(util.name("akka-private-vpc-connection"), {
+      network: networkId,
+      service: "servicenetworking.googleapis.com",
+      reservedPeeringRanges: [privateIpAddress.name],
+    });
 
     const instance = new gcp.sql.DatabaseInstance(
       util.name("instance"),
-      config.databaseInstanceArgs(gcp.config.project, networkId),
+      config.CloudSql.databaseInstanceArgs(gcp.config.project, networkId),
       { dependsOn: [privateVpcConnection] },
     );
     return new CloudSQLDatabaseInstance(instance);

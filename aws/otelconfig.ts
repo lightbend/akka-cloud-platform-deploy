@@ -1,5 +1,5 @@
-import yaml = require("js-yaml");
 import * as fs from "fs";
+import * as yaml from "js-yaml";
 
 export const awsOTelCollectorConfigFileName = "aws-otel-collector-config.yaml";
 

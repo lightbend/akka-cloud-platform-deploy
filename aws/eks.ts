@@ -123,7 +123,7 @@ export class AwsCloud {
     // Create a VPC for our cluster.
     const vpcName = util.name("vpc");
     const vpc = new awsx.ec2.Vpc(vpcName, {
-      ...config.eksVpcArgs,
+      ...config.Eks.VpcArgs,
       tags: {
         // Tags help to later identify the VPC using AWS CLI or UI.
         Name: vpcName,
@@ -140,7 +140,7 @@ export class AwsCloud {
     // create the EKS cluster
     // https://www.pulumi.com/docs/reference/pkg/aws/eks/cluster/
     const cluster = new eks.Cluster(util.name("eks"), {
-      ...config.eksClusterOptions,
+      ...config.Eks.ClusterOptions,
       skipDefaultNodeGroup: true,
       createOidcProvider: true,
       instanceRoles: [workersRole],
@@ -149,7 +149,7 @@ export class AwsCloud {
     });
 
     const nodeGroup = cluster.createNodeGroup(util.name("workers-ng"), {
-      ...config.eksClusterNodeGroupOptions,
+      ...config.Eks.ClusterNodeGroupOptions,
       labels: { ondemand: "true" },
       instanceProfile: workersInstanceProfile,
     });
@@ -264,7 +264,7 @@ export class AwsCloud {
     });
     // https://www.pulumi.com/docs/reference/pkg/aws/msk/cluster/#cluster
     const kafkaCluster = new aws.msk.Cluster(mskName, {
-      ...config.mksClusterArgs(kubernetesCluster.vpc, securityGroup, kms),
+      ...config.Mks.clusterArgs(kubernetesCluster.vpc, securityGroup, kms),
       openMonitoring: {
         prometheus: {
           jmxExporter: {

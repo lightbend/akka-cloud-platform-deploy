@@ -1,8 +1,8 @@
+/downloads/
 /bin/
 /node_modules/
 /.pulumi/
 # stack/environment files
 Pulumi.*.yaml
-package-lock.json
 akka-cloud-deploy.code-workspace
 kubeconfig.yml
