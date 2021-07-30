@@ -50,7 +50,7 @@ export class GcpCloud {
         //    Access GKE and Kubernetes features reasonably soon after they debut, but on a version that
         //    has been qualified over a longer period of time. Offers a balance of feature availability
         //    and release stability, and is what we recommend for most users.
-        channel: "REGULAR"
+        channel: "REGULAR",
       },
       resourceLabels: {
         "pulumi-stack": pulumi.getStack(),

@@ -119,9 +119,36 @@ class Grafana {
       .then((dashboards) => {
         // This is just a list of the dashboard names/configmaps to later configure
         // the helm chart. It is NOT creating any K8s resources.
-        const dashboardsConfigMaps: Record<string, string> = Object.fromEntries(
+        const dashboardConfigMapNames: Record<string, string> = Object.fromEntries(
           dashboards.map((d) => [d.name, d.name]),
         );
+
+        //
+        // Create ConfigMaps for dashboards. This creates one ConfigMap per dashboard.
+        //
+        const dashboardsConfigMaps = dashboards.map((dashboard) => {
+          return new k8s.core.v1.ConfigMap(
+            dashboard.name,
+            {
+              apiVersion: "v1",
+              metadata: {
+                namespace: "default", // TODO: make it configurable
+                name: dashboard.name,
+                labels: {
+                  grafana_dashboard: "true",
+                },
+              },
+              data: {
+                [dashboard.filename()]: dashboard.json,
+              },
+            },
+            {
+              provider: k8sProvider,
+              customTimeouts: { create: "30m", update: "30m", delete: "30m" },
+              dependsOn: [cluster],
+            },
+          );
+        });
 
         //
         // For each dashboard/ConfigMap, we then need a dashboard provider.
@@ -140,9 +167,9 @@ class Grafana {
           };
         });
 
-        const grafanaChart = new k8s.helm.v3.Chart(
         // There is some repetition between this declaration and the one below (in `simpleInstall` function). If you are
         // making changes that may affect it, remember to keep them in sync.
+        new k8s.helm.v3.Chart(
           "grafana",
           {
             chart: "grafana",
@@ -165,7 +192,7 @@ class Grafana {
               },
 
               dashboardsConfigMaps: {
-                ...dashboardsConfigMaps,
+                ...dashboardConfigMapNames,
               },
 
               // See https://github.com/grafana/helm-charts/blob/main/charts/grafana/README.md#sidecar-for-datasources
@@ -187,34 +214,9 @@ class Grafana {
           {
             provider: k8sProvider,
             customTimeouts: { create: "30m", update: "30m", delete: "30m" },
-            dependsOn: [cluster],
+            dependsOn: [cluster, ...dashboardsConfigMaps],
           },
         );
-
-        //
-        // Create ConfigMaps for dashboards. This creates one ConfigMap per dashboard.
-        //
-        dashboards.forEach((dashboard) => {
-          new k8s.core.v1.ConfigMap(
-            dashboard.name,
-            {
-              apiVersion: "v1",
-              metadata: {
-                name: dashboard.name,
-                labels: {
-                  grafana_dashboard: "true",
-                },
-              },
-              data: {
-                [dashboard.filename()]: dashboard.json,
-              },
-            },
-            {
-              provider: k8sProvider,
-              dependsOn: [cluster, grafanaChart],
-            },
-          );
-        });
 
         pulumi.log.info(`Grafana installed with Lightbend Telemetry dashboards.`);
       })
