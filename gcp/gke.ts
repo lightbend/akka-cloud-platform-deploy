@@ -62,7 +62,9 @@ export class GcpCloud {
 
     // separate node pool
     const nodePool = new gcp.container.NodePool(
-      util.name("primary-np"),
+      // There is a short limit for the node pool name on GCP, and `util.name` appends
+      // multiple information to it, so better to keep the "base name" short.
+      util.name("primary"),
       {
         ...config.Gke.nodePoolArgs(cluster.name, gcp.config.zone),
         version: engineVersion,
