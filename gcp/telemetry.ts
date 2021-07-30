@@ -141,6 +141,8 @@ class Grafana {
         });
 
         const grafanaChart = new k8s.helm.v3.Chart(
+        // There is some repetition between this declaration and the one below (in `simpleInstall` function). If you are
+        // making changes that may affect it, remember to keep them in sync.
           "grafana",
           {
             chart: "grafana",
@@ -224,6 +226,8 @@ class Grafana {
   }
 
   private simpleInstall(k8sProvider: k8s.Provider, cluster: gcp.container.Cluster): void {
+    // There is some repetition between this declaration and the one above (in `install` function). If you are
+    // making changes that may affect it, remember to keep them in sync.
     new k8s.helm.v3.Chart(
       "grafana",
       {
