@@ -36,12 +36,19 @@ export class GcpCloud {
    * Creates a GCP cluster.
    */
   createKubernetesCluster(): GcpKubernetesCluster {
+    const createdAt = new Date();
     // Create a GKE cluster
     const engineVersion = gcp.container.getEngineVersions().then((v) => v.latestMasterVersion);
     const cluster = new gcp.container.Cluster(util.name("gke"), {
       location: gcp.config.zone,
       minMasterVersion: engineVersion,
       nodeVersion: engineVersion,
+      resourceLabels: {
+        "pulumi-stack": pulumi.getStack(),
+        "pulumi-project": pulumi.getProject(),
+        // Not using `getTime` to avoid updating the resource too often
+        "pulumi-created-at": `${createdAt.getUTCFullYear()}-${createdAt.getUTCMonth()}-${createdAt.getUTCDate()}`,
+      },
       networkingMode: "VPC_NATIVE",
       // needed for VPC native cluster
       // keeping the cidr blocks empty means GKE will automatically set them up
