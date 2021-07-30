@@ -41,7 +41,7 @@ cloud.operatorServiceAccount(cluster, serviceAccountName, namespace);
 new k8s.helm.v3.Chart(
   "akka-operator",
   {
-    ...config.AkkaOperator.CharOpts,
+    ...config.AkkaOperator.ChartOpts,
     namespace: namespace.metadata.name,
     // chart values don't support shorthand value assignment syntax i.e. `serviceAccount.name: "foo"`
     values: {
