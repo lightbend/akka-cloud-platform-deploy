@@ -40,14 +40,17 @@ export class GcpCloud {
     const engineVersion = gcp.container.getEngineVersions().then((v) => v.latestMasterVersion);
     const cluster = new gcp.container.Cluster(util.name("gke"), {
       location: gcp.config.zone,
-      initialNodeCount: 1,
       minMasterVersion: engineVersion,
       nodeVersion: engineVersion,
-      removeDefaultNodePool: true,
       networkingMode: "VPC_NATIVE",
       // needed for VPC native cluster
       // keeping the cidr blocks empty means GKE will automatically set them up
       ipAllocationPolicy: { clusterIpv4CidrBlock: "", servicesIpv4CidrBlock: "" },
+      // We can't create a cluster with no node pool defined, but we want to only use
+      // separately managed node pools. So we create the smallest possible default
+      // node pool and immediately delete it.
+      initialNodeCount: 1,
+      removeDefaultNodePool: true,
     });
 
     // separate node pool
