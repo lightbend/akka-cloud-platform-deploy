@@ -153,6 +153,8 @@ class Grafana {
           };
         });
 
+        // There is some repetition between this declaration and the one below (in `simpleInstall` function). If you are
+        // making changes that may affect it, remember to keep them in sync.
         new k8s.helm.v3.Chart(
           "grafana",
           {
@@ -210,6 +212,8 @@ class Grafana {
   }
 
   private simpleInstall(k8sProvider: k8s.Provider): void {
+    // There is some repetition between this declaration and the one above (in `install` function). If you are
+    // making changes that may affect it, remember to keep them in sync.
     new k8s.helm.v3.Chart(
       "grafana",
       {
