@@ -43,6 +43,15 @@ export class GcpCloud {
       location: gcp.config.zone,
       minMasterVersion: engineVersion,
       nodeVersion: engineVersion,
+      releaseChannel: {
+        // See available channels here:
+        // https://cloud.google.com/kubernetes-engine/docs/concepts/release-channels
+        // Regular:
+        //    Access GKE and Kubernetes features reasonably soon after they debut, but on a version that
+        //    has been qualified over a longer period of time. Offers a balance of feature availability
+        //    and release stability, and is what we recommend for most users.
+        channel: "REGULAR"
+      },
       resourceLabels: {
         "pulumi-stack": pulumi.getStack(),
         "pulumi-project": pulumi.getProject(),
@@ -70,6 +79,7 @@ export class GcpCloud {
         version: engineVersion,
         management: {
           autoRepair: true,
+          autoUpgrade: true, // MUST be true if the releaseChannel is "REGULAR"
         },
       },
       {
