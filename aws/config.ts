@@ -105,7 +105,7 @@ export class Mks {
 }
 
 export class AkkaOperator {
-  static readonly CharOpts: ChartOpts = {
+  static readonly ChartOpts: ChartOpts = {
     chart: "akka-operator",
     version: config.get<string>("akka.operator.version") || Versions.AkkaPlatformOperatorVersion,
     fetchOpts: {
