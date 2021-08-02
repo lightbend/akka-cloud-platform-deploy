@@ -38,7 +38,8 @@ export class GcpCloud {
   createKubernetesCluster(): GcpKubernetesCluster {
     const createdAt = new Date();
     // Create a GKE cluster
-    const engineVersion = gcp.container.getEngineVersions().then((v) => v.latestMasterVersion);
+    const channel = "REGULAR";
+    const engineVersion = gcp.container.getEngineVersions().then((v) => v.releaseChannelDefaultVersion[channel]);
     const cluster = new gcp.container.Cluster(util.name("gke"), {
       location: gcp.config.zone,
       minMasterVersion: engineVersion,
@@ -50,7 +51,7 @@ export class GcpCloud {
         //    Access GKE and Kubernetes features reasonably soon after they debut, but on a version that
         //    has been qualified over a longer period of time. Offers a balance of feature availability
         //    and release stability, and is what we recommend for most users.
-        channel: "REGULAR",
+        channel: channel,
       },
       resourceLabels: {
         "pulumi-stack": pulumi.getStack(),
