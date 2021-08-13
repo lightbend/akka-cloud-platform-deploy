@@ -159,6 +159,13 @@ class Grafana {
           "grafana",
           {
             chart: "grafana",
+            // This IS NOT the Grafana version, but instead the chart version. The Grafana version associated with this
+            // chart version is 7.5.5. To see all the available versions, use:
+            // $ helm repo add grafana https://grafana.github.io/helm-charts
+            // $ helm repo update
+            // $ helm search repo grafana/grafana --versions
+            // Then check the `APP VERSION` column to see which chart version brings the Grafana version you want.
+            version: "6.11.0",
             fetchOpts: {
               repo: "https://grafana.github.io/helm-charts",
             },
